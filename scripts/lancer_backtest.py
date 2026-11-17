@@ -16,7 +16,11 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from missa import donnees, evaluation, marge  # noqa: E402
+import json  # noqa: E402
+
+from missa import confiance, donnees, evaluation, marge  # noqa: E402
+from missa.dixon_coles import matrice_scores  # noqa: E402
+from missa.selections import ajuster_matrice, proba_selection  # noqa: E402
 from missa.backtest import LogitOrdonne, preparer, trio  # noqa: E402
 from missa.combinaison import PoolLogarithmique  # noqa: E402
 
@@ -24,7 +28,9 @@ SAISONS = ["1718", "1819", "1920", "2021", "2122", "2223", "2324", "2425", "2526
 ENTRAINEMENT = ["1920", "2021", "2122", "2223"]
 TEST = ["2324", "2425", "2526", "2627"]
 CACHE = donnees.CACHE / "prepare.pkl"
-SORTIE = Path(__file__).resolve().parent.parent / "docs" / "resultats_backtest.md"
+RACINE = Path(__file__).resolve().parent.parent
+SORTIE = RACINE / "docs" / "resultats_backtest.md"
+MODELE = RACINE / "data" / "modele.json"
 
 
 def main():
@@ -92,6 +98,65 @@ def main():
             gain = np.where(res[i] == k, cote - 1, -1.0)
             lignes.append(f"| {nom} | {seuil:.0%} | {len(i)} | {clv.mean():+.2%} | "
                           f"{gain.mean():+.2%} | {cote.mean():.2f} |")
+
+    # 4) Plus/moins 2,5 buts : marché vs Dixon-Coles
+    ou = te.dropna(subset=["marche_ouv_plus25"])
+    y_ou = (ou.buts_dom + ou.buts_ext >= 3).to_numpy()
+    lignes.append("\n## 4. Plus/moins 2,5 buts (log-loss, plus bas = mieux)\n")
+    for nom, col in (("Dixon-Coles", "dc_plus25"), ("Marché avant clôture", "marche_ouv_plus25"),
+                     ("Marché à la clôture", "marche_clo_plus25")):
+        q = np.clip(ou[col].to_numpy(float), 1e-6, 1 - 1e-6)
+        ll = -np.mean(np.where(y_ou, np.log(q), np.log(1 - q)))
+        lignes.append(f"- {nom} : {ll:.5f}")
+
+    # 5) Mode haute confiance : probabilités finales du moteur sur le test
+    p_ou = te["marche_ouv_plus25"].fillna(te["dc_plus25"]).to_numpy(float)
+    btts = np.empty(len(te))
+    for n_, (k, r) in enumerate(te.iterrows()):
+        P = matrice_scores(r.dc_lambda, r.dc_mu, r.dc_rho)
+        P = ajuster_matrice(P, combi[n_], p_ou[n_])
+        btts[n_] = proba_selection(P, "btts_oui")
+    hg, ag = te.buts_dom.to_numpy(), te.buts_ext.to_numpy()
+    probas = {"1X2": combi,
+              "double_chance": np.stack([combi[:, 0] + combi[:, 1], combi[:, 0] + combi[:, 2],
+                                         combi[:, 1] + combi[:, 2]], axis=1),
+              "buts_2.5": np.stack([p_ou, 1 - p_ou], axis=1),
+              "btts": np.stack([btts, 1 - btts], axis=1)}
+    issues = {"1X2": np.stack([hg > ag, hg == ag, hg < ag], axis=1),
+              "double_chance": np.stack([hg >= ag, hg != ag, hg <= ag], axis=1),
+              "buts_2.5": np.stack([hg + ag >= 3, hg + ag <= 2], axis=1),
+              "btts": np.stack([(hg > 0) & (ag > 0), (hg == 0) | (ag == 0)], axis=1)}
+    cotes = {"1X2": maxi, "buts_2.5": te[["max_plus25", "max_moins25"]].to_numpy(float)}
+    table = confiance.construire(probas, issues, cotes)
+    confiance.sauvegarder(table)
+    noms = {"1X2": "Résultat 1X2", "double_chance": "Double chance",
+            "buts_2.5": "Plus/moins 2,5 buts", "btts": "Les deux équipes marquent"}
+    lignes.append("\n## 5. Mode haute confiance (sélection la plus probable, saisons de test)\n")
+    lignes.append("Taux réel = part des sélections réellement gagnantes. Rendement = en pariant à la "
+                  "meilleure cote du marché (quand elle est connue).\n")
+    for fam, tr_ in table.items():
+        lignes.append(f"\n### {noms[fam]}\n")
+        lignes.append("| Probabilité annoncée | Part des matchs | Sélections | Taux réel | Cote moy. | Rendement |")
+        lignes.append("|---|---|---|---|---|---|")
+        for t in tr_:
+            cm = f"{t['cote_moyenne']:.2f}" if "cote_moyenne" in t else "—"
+            rd = f"{t['rendement']:+.1%}" if "rendement" in t else "—"
+            lignes.append(f"| {t['de']:.0%}–{min(t['a'],1):.0%} | {t['part_des_matchs']:.1%} | "
+                          f"{t['n']} | **{t['taux_reel']:.1%}** | {cm} | {rd} |")
+
+    # 6) Fiabilité : probabilité annoncée vs fréquence observée (1X2)
+    lignes.append("\n## 6. Fiabilité des probabilités 1X2 (annoncé vs observé)\n")
+    lignes.append("| Tranche | Sélections | Annoncé | Observé |\n|---|---|---|---|")
+    for c in confiance.courbe_fiabilite(combi, issues["1X2"]):
+        lignes.append(f"| {c['de']:.0%}–{c['a']:.0%} | {c['n']} | {c['annonce']:.1%} | {c['observe']:.1%} |")
+
+    MODELE.write_text(json.dumps({
+        "pool": {"sources": pool.sources, "poids": list(map(float, pool.poids)),
+                 "biais": list(map(float, pool.biais))},
+        "elo_logit": {"b": lo.b, "c1": lo.c1, "c2": lo.c2},
+        "dixon_coles_xi": 0.0019, "elo": {"k": 20.0, "avantage_domicile": 70.0},
+        "entrainement": ENTRAINEMENT, "test": TEST,
+    }, indent=1), encoding="utf-8")
 
     texte = "\n".join(lignes) + "\n"
     SORTIE.write_text(texte, encoding="utf-8")

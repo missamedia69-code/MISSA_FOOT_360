@@ -116,11 +116,12 @@ def test_retention_et_kelly():
 
 def test_pronostiqueur_talent_vs_hasard():
     rng = np.random.default_rng(1)
-    bon = [Pronostic("A", str(i), 0, 2.0 * (1 + rng.normal(0.04, 0.05)), 2.0) for i in range(100)]
-    hasard = [Pronostic("B", str(i), 0, 2.0 * (1 + rng.normal(0.0, 0.05)), 2.0) for i in range(100)]
-    triche = [Pronostic("C", str(i), 0, 2.0, 2.0, horodatage_avant_match=False) for i in range(100)]
-    assert evaluer(bon)["poids"] > 0
-    assert evaluer(hasard)["poids"] == 0
+    # proba juste de clôture 0,5 -> cote juste 2,0
+    bon = [Pronostic("A", str(i), "1", 2.0 * (1 + rng.normal(0.04, 0.05)), 0.5) for i in range(100)]
+    hasard = [Pronostic("B", str(i), "1", 2.0 * (1 + rng.normal(0.0, 0.05)), 0.5) for i in range(100)]
+    triche = [Pronostic("C", str(i), "1", 2.0, 0.5, horodatage_avant_match=False) for i in range(100)]
+    assert evaluer(bon)["ajustement"] > 0
+    assert evaluer(hasard)["ajustement"] == 0
     assert evaluer(triche)["n"] == 0
 
 

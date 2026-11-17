@@ -27,7 +27,7 @@ def probas_marche(df: pd.DataFrame, prefixe: str, methode: str = "puissance") ->
 def ajouter_dixon_coles(df: pd.DataFrame, xi: float = 0.0019, jours_refit: int = 7,
                         historique_jours: int = 3 * 365) -> pd.DataFrame:
     df = df.copy()
-    for col in ("dc_H", "dc_D", "dc_A", "dc_lambda", "dc_mu", "dc_plus25", "dc_btts"):
+    for col in ("dc_H", "dc_D", "dc_A", "dc_lambda", "dc_mu", "dc_plus25", "dc_btts", "dc_rho"):
         df[col] = np.nan
     for champ, g in df.groupby("championnat"):
         dates = g["date"].sort_values().unique()
@@ -43,8 +43,9 @@ def ajouter_dixon_coles(df: pd.DataFrame, xi: float = 0.0019, jours_refit: int =
                 pr = modele.predire(df.at[i, "domicile"], df.at[i, "exterieur"])
                 if pr is None:
                     continue
-                df.loc[i, ["dc_H", "dc_D", "dc_A", "dc_lambda", "dc_mu", "dc_plus25", "dc_btts"]] = [
-                    pr["1"], pr["N"], pr["2"], pr["lambda"], pr["mu"], pr["plus_2.5"], pr["btts_oui"]]
+                df.loc[i, ["dc_H", "dc_D", "dc_A", "dc_lambda", "dc_mu", "dc_plus25", "dc_btts",
+                           "dc_rho"]] = [pr["1"], pr["N"], pr["2"], pr["lambda"], pr["mu"],
+                                         pr["plus_2.5"], pr["btts_oui"], modele.rho]
     return df
 
 
@@ -95,6 +96,8 @@ def preparer(df: pd.DataFrame, methode_marge: str = "puissance") -> pd.DataFrame
     for nom, pre in (("marche_ouv", "ouv"), ("marche_clo", "clo")):
         p = probas_marche(df, pre, methode_marge)
         df[[f"{nom}_H", f"{nom}_D", f"{nom}_A"]] = p
+        ou = df[[f"{pre}_plus25", f"{pre}_moins25"]].to_numpy(float)
+        df[f"{nom}_plus25"] = [marge.probabilites(c, "abrams")[0] for c in ou]
     return df
 
 
