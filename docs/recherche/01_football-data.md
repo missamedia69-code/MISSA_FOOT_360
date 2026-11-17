@@ -227,6 +227,29 @@ expliquer un résultat avant de l'utiliser.
   de la vraie probabilité que la cote moyenne, surtout pour les outsiders.
 - Prudence sur les pronostics d'outsiders : c'est là que la marge est la plus forte.
 
+## 18. Favourite-Longshot Bias: A Bias or Not a Bias? (2023) — retrait de marge (marchés à 2 issues)
+
+- Théorie de Dan Abrams : le biais favori/outsider n'est pas irrationnel. Le bookmaker égalise le
+  **risque** (même probabilité de perdre contre un client après N paris, ou même croissance de Kelly
+  maximale) des deux côtés ; comme l'outsider a beaucoup plus de variance, il doit y mettre plus de marge.
+- Exemple dé (vraies cotes 6 / 1,2, marge 3 %) : marge égale → 5,83 / 1,165, le client a 33,6 % de chances
+  d'être gagnant après 1 000 paris sur l'outsider contre 1,7 % sur le favori. Pour égaliser à 10 % :
+  5,5 / 1,179, soit poids de marge 9,09 % (outsider) contre 1,78 % (favori).
+- **Formule d'Abrams** (p, q = probabilités implicites du favori et de l'outsider selon les cotes du bookmaker) :
+  `cote_juste_outsider = log[(1 − p)/q] / log[(1 − q)/p] + 1`
+  `cote_juste_favori = cote_juste_outsider / (cote_juste_outsider − 1)`
+  Vérifié : 1,179 / 5,5 → 1,200 / 6,007 ✔
+- Validation : 94 538 cotes de clôture Pinnacle (tennis 2014–2023) ; pertes réelles vs pertes attendues
+  (`cote_bookmaker / cote_juste − 1`) : p-value 0,50 → aucune différence, la méthode est juste.
+- Quasi identique aux méthodes « odds ratio » et « marge proportionnelle à la cote ».
+- **Limite** : valable pour les marchés à **2 issues** (Over/Under, handicap asiatique, BTTS).
+  Pour le 1X2 (3 issues), pas de formule fermée → utiliser « marge proportionnelle à la cote »,
+  Shin ou la méthode « puissance ».
+
+**Pour l'appli** : module `retrait_marge` avec Abrams pour les marchés à 2 issues et Shin/puissance
+pour le 1X2 ; tester les méthodes sur les données historiques (celle qui donne le meilleur
+Brier/log-loss gagne).
+
 ---
 
 ## Synthèse pour la conception
@@ -240,5 +263,6 @@ expliquer un résultat avant de l'utiliser.
    alertes de sur-apprentissage.
 5. **Signaux supplémentaires** : mouvement des cotes ouverture → clôture ; métriques Brier/log-loss
    comparées au marché ; projection de classement par Monte-Carlo.
-6. **Retrait de marge** : méthode non uniforme (Shin / puissance / proportionnelle à la cote).
+6. **Retrait de marge** : méthode non uniforme — Abrams pour 2 issues ; Shin / puissance /
+   proportionnelle à la cote pour le 1X2 ; choix validé par backtest.
 7. **À ignorer** : tendances de séries (y compris séries de victoires des pronostiqueurs), avis majoritaire du public, rendements sur petits échantillons.
