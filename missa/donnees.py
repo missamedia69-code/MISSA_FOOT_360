@@ -148,8 +148,11 @@ def charger_calendrier(source=URL_CALENDRIER) -> pd.DataFrame:
     heure = df["Time"].fillna("15:00") if "Time" in df.columns else "15:00"
     out = pd.DataFrame({
         "championnat": df["Div"].str.strip(), "date": df["date"],
+        # heure anglaise -> UTC (sans fuseau), comme les cotes de The Odds API
         "coup_envoi": pd.to_datetime(df["Date"] + " " + heure, dayfirst=True, format="mixed",
-                                     errors="coerce"),
+                                     errors="coerce").dt.tz_localize("Europe/London", nonexistent="shift_forward",
+                                                                     ambiguous="NaT")
+                                     .dt.tz_convert("UTC").dt.tz_localize(None),
         "domicile": df["HomeTeam"].str.strip(), "exterieur": df["AwayTeam"].str.strip(),
     })
     return out.join(extraire_cotes(df, df["date"])).reset_index(drop=True)

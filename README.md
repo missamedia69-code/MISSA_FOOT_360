@@ -76,6 +76,20 @@ Le fichier `.github/workflows/pronostics.yml` lance `scripts/publier.py` toutes 
 
 L'application lit cette adresse par défaut. Coût : 0 € (quelques minutes d'exécution par jour).
 
+### Cotes en continu : The Odds API (facultatif)
+
+1. Créer une clé gratuite sur https://the-odds-api.com (500 crédits/mois).
+2. Sur GitHub : *Settings → Secrets and variables → Actions → New repository secret*,
+   nom `ODDS_API_KEY`, valeur = la clé.
+3. Facultatif, onglet *Variables* : `ODDS_API_SPORTS` (ex. `soccer_epl,soccer_france_ligue_one`)
+   et `ODDS_API_FREQUENCE_HEURES` (défaut 24).
+
+Chaque appel coûte 2 crédits par championnat (1X2 + plus/moins). Par défaut : 8 championnats une
+fois par jour ≈ 480 crédits/mois, dans l'offre gratuite. Avec une offre payante, mettre par
+exemple `ODDS_API_FREQUENCE_HEURES = 3`. Les matchs de The Odds API remplacent ceux de
+football-data quand les deux existent ; les noms d'équipes non reconnus sont listés dans
+`etat.json` (champ `the_odds_api.noms_non_reconnus`).
+
 ## Application Android
 
 ```bash

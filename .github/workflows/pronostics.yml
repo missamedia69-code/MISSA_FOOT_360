@@ -39,6 +39,13 @@ jobs:
           restore-keys: football-data-
 
       - name: Calculer les pronostics
+        env:
+          # Clé The Odds API : Settings > Secrets and variables > Actions > New repository secret
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+          # Réglages facultatifs (onglet « Variables ») : championnats et fréquence des appels
+          ODDS_API_SPORTS: ${{ vars.ODDS_API_SPORTS }}
+          ODDS_API_FREQUENCE_HEURES: ${{ vars.ODDS_API_FREQUENCE_HEURES }}
+          PUBLICATION_URL: https://raw.githubusercontent.com/${{ github.repository }}/pronostics
         run: python scripts/publier.py --sortie publication
 
       - name: Publier sur la branche « pronostics »

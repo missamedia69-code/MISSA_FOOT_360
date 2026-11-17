@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
+import urllib.request
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,7 +24,7 @@ import pandas as pd
 RACINE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RACINE))
 
-from missa import donnees  # noqa: E402
+from missa import donnees, odds_api  # noqa: E402
 from missa.pipeline import Moteur, identifiant, saisons_precedentes  # noqa: E402
 from missa.stockage import Stockage  # noqa: E402
 
@@ -59,6 +61,69 @@ def cloturer(stockage: Stockage) -> int:
     return n
 
 
+def cotes_odds_api(sortie: Path) -> tuple[pd.DataFrame | None, dict]:
+    """Cotes fraîches de The Odds API, en respectant un budget de crédits.
+
+    Variables d'environnement :
+      ODDS_API_KEY              clé (secret GitHub) — sans clé, cette étape est ignorée
+      ODDS_API_SPORTS           championnats, séparés par des virgules (défaut : 8 championnats)
+      ODDS_API_FREQUENCE_HEURES intervalle minimal entre deux appels (défaut 24 h ≈ 480 crédits/mois)
+      PUBLICATION_URL           adresse de la publication précédente (pour réutiliser les cotes)
+    """
+    cle = os.environ.get("ODDS_API_KEY", "").strip()
+    info = {"active": bool(cle)}
+    if not cle:
+        return None, info
+    sports = [x.strip() for x in os.environ.get("ODDS_API_SPORTS", "").split(",") if x.strip()] or odds_api.PAR_DEFAUT
+    freq = float(os.environ.get("ODDS_API_FREQUENCE_HEURES") or 24)
+    precedent = None
+    base = os.environ.get("PUBLICATION_URL", "").rstrip("/")
+    if base:
+        try:
+            with urllib.request.urlopen(base + "/cotes_odds_api.json", timeout=30) as r:
+                precedent = json.loads(r.read())
+        except Exception:
+            precedent = None
+    maintenant = datetime.now(timezone.utc)
+    instantane = precedent
+    age = None
+    if precedent:
+        age = (maintenant - datetime.fromisoformat(precedent["recupere_le"])).total_seconds() / 3600
+    if precedent is None or age >= freq:
+        evenements, restant = {}, None
+        for sp in sports:
+            if restant is not None and restant < 2:
+                info["arret"] = "crédits épuisés"
+                break
+            try:
+                evenements[sp], restant = odds_api.recuperer(cle, sp)
+            except Exception as e:
+                info.setdefault("erreurs", []).append(f"{sp} : {e}")
+        if evenements:
+            instantane = {"recupere_le": maintenant.isoformat(timespec="seconds"),
+                          "credits_restants": restant, "evenements": evenements}
+    if not instantane:
+        return None, info
+    (sortie / "cotes_odds_api.json").write_text(json.dumps(instantane), encoding="utf-8")
+    equipes = {}
+    for sp in instantane["evenements"]:
+        champ = odds_api.SPORTS.get(sp)
+        if not champ:
+            continue
+        noms = set()
+        for s_ in saisons_precedentes(pd.Timestamp.now(), 2):
+            try:
+                h = donnees.charger_saison(champ, s_)
+                noms |= set(h.domicile) | set(h.exterieur)
+            except Exception:
+                pass
+        equipes[champ] = sorted(noms)
+    cal, inconnus = odds_api.vers_calendrier(instantane["evenements"], equipes)
+    info |= {"recupere_le": instantane["recupere_le"], "credits_restants": instantane.get("credits_restants"),
+             "matchs": int(len(cal)), "noms_non_reconnus": inconnus}
+    return cal, info
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--sortie", default=str(RACINE / "publication"))
@@ -73,9 +138,15 @@ def main():
         rapport_experts = stockage.importer_csv(CSV_EXPERTS)
         rapport_experts["clotures"] = cloturer(stockage)
 
-    calendrier = donnees.charger_calendrier(a.calendrier)
+    try:
+        calendrier = donnees.charger_calendrier(a.calendrier)
+    except Exception as e:  # football-data indisponible : on continue avec The Odds API
+        print(f"[publier] calendrier football-data indisponible : {e}")
+        calendrier = pd.DataFrame(columns=["championnat", "date", "coup_envoi", "domicile", "exterieur"])
+    cal_odds, info_odds = cotes_odds_api(sortie)
+    calendrier = odds_api.fusionner(cal_odds, calendrier)
     # on ne publie que les matchs à venir (ou commencés depuis moins de 2 heures)
-    limite = pd.Timestamp.now(tz="Europe/London").tz_localize(None) - pd.Timedelta(hours=2)
+    limite = pd.Timestamp.now(tz="UTC").tz_localize(None) - pd.Timedelta(hours=2)
     calendrier = calendrier[calendrier["coup_envoi"].fillna(calendrier["date"]) >= limite]
     res = Moteur(stockage=stockage).predire(calendrier)
     nb = sum(len(c["matchs"]) for c in res["championnats"])
@@ -85,7 +156,7 @@ def main():
                                                 encoding="utf-8")
     etat = {"genere_le": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "matchs": nb, "championnats": [c["code"] for c in res["championnats"] if c["matchs"]],
-            "experts": rapport_experts}
+            "experts": rapport_experts, "the_odds_api": info_odds}
     (sortie / "etat.json").write_text(json.dumps(etat, ensure_ascii=False, indent=1), encoding="utf-8")
     print(json.dumps(etat, ensure_ascii=False, indent=1))
 

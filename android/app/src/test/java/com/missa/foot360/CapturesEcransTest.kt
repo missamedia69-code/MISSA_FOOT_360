@@ -1,7 +1,8 @@
 package com.missa.foot360
 
 import android.content.Context
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.test.core.app.ActivityScenario
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
@@ -30,7 +31,7 @@ class CapturesEcransTest {
     }
 
     @get:Rule
-    val regle = createAndroidComposeRule<MainActivity>()
+    val regle = createEmptyComposeRule()
 
     private fun attendreDonnees() = regle.waitUntil(20_000) {
         regle.onAllNodesWithText("Score probable", substring = true).fetchSemanticsNodes().isNotEmpty()
@@ -38,7 +39,8 @@ class CapturesEcransTest {
 
     @Test
     fun parcours() {
-        regle.onNodeWithText("J'ai 18 ans ou plus").performClick()
+        // l'application démarre après la configuration (serveur injoignable -> données de démonstration)
+        ActivityScenario.launch(MainActivity::class.java)
         attendreDonnees()
         regle.onRoot().captureRoboImage("../../docs/captures/1_matchs.png")
         regle.onAllNodesWithText("1", useUnmergedTree = true)[0].performClick()

@@ -164,7 +164,7 @@ class Moteur:
         P = ajuster_par_pronostiqueurs(P, [(a["selection"], a["ajustement"]) for a in avis])
 
         coup_envoi = pd.Timestamp(m.get("coup_envoi") if pd.notna(m.get("coup_envoi")) else d)
-        maintenant = pd.Timestamp(maintenant or datetime.now())
+        maintenant = pd.Timestamp(maintenant) if maintenant else pd.Timestamp.now(tz="UTC").tz_localize(None)
         heures = max(0.0, (coup_envoi - maintenant).total_seconds() / 3600)
         meilleures = {"1": m.get("max_H"), "N": m.get("max_D"), "2": m.get("max_A"),
                       "plus_2.5": m.get("max_plus25"), "moins_2.5": m.get("max_moins25")}
@@ -196,7 +196,7 @@ class Moteur:
                         key=lambda c: -marches[c]["valeur"])
         return {
             "id": mid, "disponible": True, "championnat": champ,
-            "coup_envoi": coup_envoi.isoformat(), "domicile": m["domicile"],
+            "coup_envoi": coup_envoi.isoformat() + "Z", "domicile": m["domicile"],
             "exterieur": m["exterieur"], "methode": methode,
             "buts_attendus": [round(float(np.sum(np.arange(len(P)) * P.sum(1))), 2),
                               round(float(np.sum(np.arange(len(P)) * P.sum(0))), 2)],

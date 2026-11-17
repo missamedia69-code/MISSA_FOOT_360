@@ -83,8 +83,16 @@ data class Match(
     val corners_attendus: List<Double> = emptyList(),
     val cartons_attendus: List<Double> = emptyList(),
 ) {
-    val date: String get() = coup_envoi.take(10)
-    val heure: String get() = coup_envoi.drop(11).take(5)
+    /** Coup d'envoi dans le fuseau horaire du téléphone (les heures publiées sont en UTC, « …Z »). */
+    private val local: java.time.LocalDateTime?
+        get() = runCatching {
+            if (coup_envoi.endsWith("Z") || coup_envoi.length > 19)
+                java.time.OffsetDateTime.parse(coup_envoi)
+                    .atZoneSameInstant(java.time.ZoneId.systemDefault()).toLocalDateTime()
+            else java.time.LocalDateTime.parse(coup_envoi)
+        }.getOrNull()
+    val date: String get() = local?.toLocalDate()?.toString() ?: coup_envoi.take(10)
+    val heure: String get() = local?.toLocalTime()?.toString()?.take(5) ?: coup_envoi.drop(11).take(5)
 }
 
 @Serializable

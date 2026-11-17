@@ -205,7 +205,7 @@ def ajouter_pronostic(p: PronosticIn, x_cle_admin: str | None = Header(None)):
         raise HTTPException(404, "Match introuvable")
     try:
         i = stockage.ajouter_pronostic(p.pronostiqueur, p.match_id, p.selection, p.cote,
-                                       datetime.fromisoformat(m["coup_envoi"]))
+                                       datetime.fromisoformat(m["coup_envoi"].rstrip("Z")))
     except ValueError as e:
         raise HTTPException(400, str(e))
     except Exception as e:  # doublon
