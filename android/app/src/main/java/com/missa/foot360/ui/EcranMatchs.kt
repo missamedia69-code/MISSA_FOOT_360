@@ -60,6 +60,11 @@ fun EcranMatchs(etat: EtatApp, vm: AppViewModel, ouvrir: (String) -> Unit) {
     val replies = remember { mutableStateMapOf<String, Boolean>() }
 
     LazyColumn(contentPadding = PaddingValues(bottom = 90.dp)) {
+        if (!etat.horsLigne && dates.isEmpty()) item {
+            Text("Aucun match à venir n'est publié pour le moment. Les calendriers et les cotes sont " +
+                "mis à jour le mardi et le vendredi après-midi ; les pronostics sont recalculés " +
+                "automatiquement toutes les 3 heures.", fontSize = 13.sp, modifier = Modifier.padding(16.dp))
+        }
         if (etat.horsLigne) item {
             Text("Mode démonstration hors ligne (pronostics injoignables : pas de connexion ?). Données d'exemple.",
                 color = Or, fontSize = 12.sp, modifier = Modifier.padding(12.dp))

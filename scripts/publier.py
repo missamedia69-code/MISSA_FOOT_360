@@ -74,6 +74,9 @@ def main():
         rapport_experts["clotures"] = cloturer(stockage)
 
     calendrier = donnees.charger_calendrier(a.calendrier)
+    # on ne publie que les matchs à venir (ou commencés depuis moins de 2 heures)
+    limite = pd.Timestamp.now(tz="Europe/London").tz_localize(None) - pd.Timedelta(hours=2)
+    calendrier = calendrier[calendrier["coup_envoi"].fillna(calendrier["date"]) >= limite]
     res = Moteur(stockage=stockage).predire(calendrier)
     nb = sum(len(c["matchs"]) for c in res["championnats"])
 
