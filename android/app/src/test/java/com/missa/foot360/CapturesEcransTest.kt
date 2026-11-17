@@ -5,6 +5,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.onRoot
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -40,22 +41,32 @@ class CapturesEcransTest {
         regle.onNodeWithText("J'ai 18 ans ou plus").performClick()
         attendreDonnees()
         regle.onRoot().captureRoboImage("../../docs/captures/1_matchs.png")
-        // ajout de deux sélections au combiné
         regle.onAllNodesWithText("1", useUnmergedTree = true)[0].performClick()
         regle.onAllNodesWithText("N", useUnmergedTree = true)[1].performClick()
         regle.waitForIdle()
-        regle.onRoot().captureRoboImage("../../docs/captures/2_combine_barre.png")
-        regle.onNodeWithText("Voir ›").performClick()
-        regle.waitForIdle()
-        regle.onRoot().captureRoboImage("../../docs/captures/3_combine.png")
-        regle.onNodeWithText("Confiance").performClick()
-        regle.waitForIdle()
-        regle.onRoot().captureRoboImage("../../docs/captures/4_haute_confiance.png")
-        regle.onNodeWithText("Matchs").performClick()
-        regle.waitForIdle()
-        attendreDonnees()
         regle.onNodeWithText("AFC Wimbledon - Blackpool", useUnmergedTree = true).performClick()
         regle.waitForIdle()
-        regle.onRoot().captureRoboImage("../../docs/captures/5_detail_match.png")
+        regle.onRoot().captureRoboImage("../../docs/captures/2_detail_resultat.png")
+        regle.onNodeWithText("Mi-temps").performScrollTo().performClick()
+        regle.waitForIdle()
+        regle.onRoot().captureRoboImage("../../docs/captures/3_detail_mi_temps.png")
+        regle.onNodeWithText("Corners").performScrollTo().performClick()
+        regle.waitForIdle()
+        regle.onAllNodesWithText("Plus de 9,5", useUnmergedTree = true)[0].performClick()
+        regle.onNodeWithText("Buts").performScrollTo().performClick()
+        regle.waitForIdle()
+        regle.onAllNodesWithText("Plus de 1,5", useUnmergedTree = true)[0].performClick()
+        regle.onNodeWithText("Moduler le match", substring = true).performClick()
+        regle.waitForIdle()
+        regle.onRoot().captureRoboImage("../../docs/captures/4_modulation.png")
+        regle.onNodeWithText("Voir ›").performClick()
+        regle.waitForIdle()
+        regle.onRoot().captureRoboImage("../../docs/captures/5_combine.png")
+        regle.onNodeWithText("Assistant").performClick()
+        regle.waitForIdle()
+        regle.onRoot().captureRoboImage("../../docs/captures/6_assistant.png")
+        regle.onNodeWithText("Confiance").performClick()
+        regle.waitForIdle()
+        regle.onRoot().captureRoboImage("../../docs/captures/7_haute_confiance.png")
     }
 }

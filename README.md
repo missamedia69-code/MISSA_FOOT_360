@@ -27,6 +27,9 @@ Moteur de pronostic de matchs de football fondé sur la recherche (voir `docs/re
 | `missa/valeur.py` | Valeur attendue, rétention selon le délai, Kelly, CLV |
 | `missa/evaluation.py` | RPS, log-loss, Brier |
 | `missa/backtest.py` | Préparation sans fuite d'information |
+| `missa/jumeau.py` | **Jumeau numérique du match** : loi jointe mi-temps/score final, corners, cartons ; toute sélection ou combinaison (ET / OU), modulations |
+| `missa/comptages.py` | Modèles par équipe pour les corners et les cartons |
+| `scripts/valider_jumeau.py` | Validation de ~170 marchés et de 20 000 combinés sur saisons jamais vues → `docs/validation_jumeau.md` |
 | `missa/selections.py` | Sélections (1X2, double chance, buts, BTTS, score exact) et probabilité des combinés |
 | `missa/confiance.py` | Mode haute confiance : taux de réussite réel mesuré par niveau de probabilité |
 | `missa/stockage.py` | Base SQLite des pronostiqueurs (pronostics non modifiables, refusés après le coup d'envoi) |
@@ -43,6 +46,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m pytest -q
 .venv/bin/pip install fastapi uvicorn httpx
 .venv/bin/python scripts/lancer_backtest.py      # entraîne et calibre (≈ 1 min)
+.venv/bin/python scripts/valider_jumeau.py       # valide le jumeau et ses paramètres (≈ 4 min)
 .venv/bin/python scripts/generer_pronostics.py   # pronostics des prochains matchs
 MISSA_CLE_ADMIN=un-secret .venv/bin/uvicorn api.main:app --host 0.0.0.0 --port 8000
 ```
@@ -67,8 +71,15 @@ cd android && ./gradlew testDebugUnitTest assembleDebug   # APK : app/build/outp
 
 - Liste des matchs par jour et par championnat, pronostic 1X2 de chaque match.
 - Détail : tous les marchés avec probabilité, cote juste, meilleure cote, value, niveau de confiance.
-- Combiné : la probabilité est recalculée en temps réel sur le téléphone à partir de la matrice
-  des scores (les sélections d'un même match sont corrélées, pas simplement multipliées).
+- Détail d'un match : ~170 sélections réparties en onglets (résultat, buts, équipes, mi-temps,
+  combinés officiels, corners, cartons), avec cote juste et taux de réussite réel mesuré.
+- Modulation : curseurs (attaque, corners, cartons) pour intégrer une information (absence, arbitre…) ;
+  toutes les probabilités se recalculent instantanément.
+- Combiné : probabilité calculée en temps réel sur le téléphone par le même jumeau que le serveur
+  (parité vérifiée sur 1 062 cas, écart < 1e-13) ; sélections d'un même match combinées exactement ;
+  bonus de gains du bookmaker pris en compte dans la valeur attendue.
+- Assistant : construit le combiné le plus probable selon le nombre de matchs, la cote minimale par
+  sélection et les types de paris autorisés.
 - Mode haute confiance, classement des pronostiqueurs, réglage de l'adresse du serveur.
 - Sans serveur, l'application affiche des données de démonstration (`assets/demo.json`).
 - Captures d'écran : `docs/captures/` (générées par `CapturesEcransTest`).

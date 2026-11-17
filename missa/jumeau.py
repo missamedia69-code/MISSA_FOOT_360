@@ -198,6 +198,10 @@ class JumeauMatch:
     cartons: tuple = (1.9, 2.1, 0.38)       # (moyenne dom, moyenne ext, covariance)
     _cache: dict = field(default_factory=dict, repr=False, compare=False)
 
+    def __post_init__(self):
+        M = np.asarray(self.matrice, float)
+        self.matrice = M / M.sum()
+
     # --- grilles -------------------------------------------------------------------
     def grille_buts(self):
         if "buts" not in self._cache:

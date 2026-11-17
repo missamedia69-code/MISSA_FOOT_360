@@ -25,7 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.missa.foot360.moteur.Selections
+import com.missa.foot360.moteur.Jumeau
 
 /** Mode haute confiance : uniquement les sélections dont l'historique mesuré dépasse 85 %. */
 @Composable
@@ -33,6 +33,7 @@ fun EcranConfiance(etat: EtatApp, vm: AppViewModel, ouvrir: (String) -> Unit) {
     val liste = etat.matchs.values.mapNotNull { m ->
         m.selection_haute_confiance?.let { c -> Triple(m, c, m.marches[c]) }
     }.sortedByDescending { it.third?.proba ?: 0.0 }
+    // NB : ces sélections sont recalculées avec la modulation éventuelle de l'utilisateur
     LazyColumn(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 100.dp)) {
         item {
             Text("Mode haute confiance", fontSize = 20.sp, fontWeight = FontWeight.Bold)
@@ -43,17 +44,18 @@ fun EcranConfiance(etat: EtatApp, vm: AppViewModel, ouvrir: (String) -> Unit) {
             if (liste.isEmpty()) Text("Aucune sélection haute confiance pour les matchs disponibles.")
         }
         items(liste, key = { it.first.id }) { (m, code, mk) ->
-            val sel = etat.combi.any { it.matchId == m.id && it.code == code }
             Card(Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { ouvrir(m.id) }) {
                 Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("${m.date.split("-").reversed().joinToString("/")} ${m.heure} · ${m.domicile} - ${m.exterieur}", fontSize = 12.sp)
-                        Text(Selections.libelle(code), fontWeight = FontWeight.Bold, color = Or)
+                        Text(mk?.libelle ?: code, fontWeight = FontWeight.Bold, color = Or)
                         Text("Probabilité ${pct(mk?.proba)} · historique ${pct(mk?.confiance?.taux_historique)} " +
                             "sur ${mk?.confiance?.n_historique ?: 0}", fontSize = 12.sp)
                     }
-                    BoutonSelection(if (sel) "Ajouté" else "Ajouter", mk?.proba, sel,
-                        Modifier.width(88.dp)) { vm.basculer(m, code) }
+                    val cj = Jumeau.depuisAncien(code)
+                    val dejaLa = etat.combi.any { it.matchId == m.id && it.code == cj }
+                    BoutonSelection(if (dejaLa) "Ajouté" else "Ajouter", vm.proba(m.id, cj) ?: mk?.proba, dejaLa,
+                        Modifier.width(88.dp)) { vm.basculer(m, cj, mk?.libelle ?: cj) }
                 }
             }
         }

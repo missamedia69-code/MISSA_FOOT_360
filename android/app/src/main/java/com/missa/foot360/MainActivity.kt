@@ -7,6 +7,7 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SportsSoccer
@@ -38,6 +39,7 @@ import androidx.navigation.compose.rememberNavController
 import com.missa.foot360.ui.AppViewModel
 import com.missa.foot360.ui.BandeauJeuResponsable
 import com.missa.foot360.ui.BarreCombi
+import com.missa.foot360.ui.EcranAssistant
 import com.missa.foot360.ui.EcranCombi
 import com.missa.foot360.ui.EcranConfiance
 import com.missa.foot360.ui.EcranDetail
@@ -58,6 +60,7 @@ class MainActivity : ComponentActivity() {
 
 private val ONGLETS = listOf(
     Triple("matchs", "Matchs", Icons.Default.SportsSoccer),
+    Triple("assistant", "Assistant", Icons.Default.AutoAwesome),
     Triple("confiance", "Confiance", Icons.Default.Star),
     Triple("experts", "Experts", Icons.Default.Groups),
     Triple("reglages", "Réglages", Icons.Default.Settings),
@@ -111,6 +114,7 @@ fun Application(vm: AppViewModel) {
     ) { marges ->
         NavHost(nav, startDestination = "matchs", modifier = Modifier.padding(marges)) {
             composable("matchs") { EcranMatchs(etat, vm) { nav.navigate("match/$it") } }
+            composable("assistant") { EcranAssistant(etat, vm) { nav.navigate("combi") } }
             composable("confiance") { EcranConfiance(etat, vm) { nav.navigate("match/$it") } }
             composable("experts") { EcranExperts(etat) }
             composable("reglages") { EcranReglages(vm, etat) }

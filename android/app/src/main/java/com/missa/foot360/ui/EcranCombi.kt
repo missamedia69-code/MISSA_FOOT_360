@@ -34,7 +34,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.missa.foot360.moteur.Selections
 
 /** Barre fixe en bas de l'écran : probabilité du combiné mise à jour en temps réel. */
 @Composable
@@ -73,8 +72,8 @@ fun EcranCombi(etat: EtatApp, vm: AppViewModel) {
                 Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(s.libelleMatch, fontSize = 12.sp)
-                        Text(Selections.libelle(s.code), fontWeight = FontWeight.Bold)
-                        val p = etat.matchs[s.matchId]?.let { Selections.proba(it.matrice, listOf(s.code)) }
+                        Text(s.libelle, fontWeight = FontWeight.Bold)
+                        val p = vm.proba(s.matchId, s.code)
                         Text("Probabilité seule : ${pct(p)}", fontSize = 12.sp, color = Vert)
                     }
                     var texte by remember(s.matchId, s.code) { mutableStateOf(s.cote?.let { cote(it) } ?: "") }
@@ -92,12 +91,28 @@ fun EcranCombi(etat: EtatApp, vm: AppViewModel) {
             }
         }
         if (r != null) item {
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
+            var bonus by remember { mutableStateOf(if (etat.bonus > 0) "%.0f".format(etat.bonus * 100) else "") }
+            OutlinedTextField(
+                value = bonus, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                label = { Text("Bonus de gains du bookmaker sur ce combiné (%)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                onValueChange = {
+                    bonus = it
+                    vm.modifierBonus((it.replace(',', '.').toDoubleOrNull() ?: 0.0) / 100)
+                },
+            )
+            Spacer(Modifier.height(12.dp))
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Ligne("Probabilité du combiné", pct(r.proba, 2), Vert)
                     Ligne("Cote juste (équitable)", cote(r.coteJuste))
                     Ligne("Cote du bookmaker", cote(r.coteBookmaker))
+                    if (etat.bonus > 0) Ligne("Bonus inclus", "+${"%.0f".format(etat.bonus * 100)} %")
+                    if (r.probaParMatch.size > 1) r.probaParMatch.forEach { (id, p) ->
+                        val mm = etat.matchs[id]
+                        Ligne("  ${mm?.domicile ?: id} - ${mm?.exterieur ?: ""}", pct(p))
+                    }
                     r.valeurAttendue?.let {
                         Ligne("Valeur attendue", signe(it), if (it > 0) Vert else Rouge)
                     }

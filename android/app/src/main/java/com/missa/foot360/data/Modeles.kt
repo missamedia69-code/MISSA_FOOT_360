@@ -11,6 +11,26 @@ data class Pronostics(
     val genere_le: String = "",
     val avertissement: String = "",
     val championnats: List<Championnat> = emptyList(),
+    val catalogue: List<GroupeMarche> = emptyList(),
+    val fiabilite: Map<String, List<TrancheFiabilite>> = emptyMap(),
+)
+
+@Serializable
+data class OptionMarche(val code: String, val libelle: String)
+
+@Serializable
+data class GroupeMarche(val groupe: String, val titre: String, val options: List<OptionMarche>)
+
+/** Historique mesuré : sélections annoncées entre « de » et « a » -> taux de réussite réel. */
+@Serializable
+data class TrancheFiabilite(val de: Double, val a: Double, val n: Int, val annonce: Double, val reel: Double)
+
+@Serializable
+data class JumeauJson(
+    val matrice: List<List<Double>>,
+    val part_1mt: List<Double>,
+    val corners: List<Double>,
+    val cartons: List<Double>,
 )
 
 @Serializable
@@ -59,6 +79,9 @@ data class Match(
     val marches: Map<String, Marche> = emptyMap(),
     val pronostiqueurs: List<AvisPronostiqueur> = emptyList(),
     val matrice: List<List<Double>> = emptyList(),
+    val jumeau: JumeauJson? = null,
+    val corners_attendus: List<Double> = emptyList(),
+    val cartons_attendus: List<Double> = emptyList(),
 ) {
     val date: String get() = coup_envoi.take(10)
     val heure: String get() = coup_envoi.drop(11).take(5)

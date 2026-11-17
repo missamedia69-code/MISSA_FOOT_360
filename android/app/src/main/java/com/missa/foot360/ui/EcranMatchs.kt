@@ -39,7 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.missa.foot360.data.Match
-import com.missa.foot360.moteur.Selections
+import com.missa.foot360.moteur.Jumeau
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -116,9 +116,10 @@ fun CarteMatch(m: Match, vm: AppViewModel, etat: EtatApp, ouvrir: () -> Unit) {
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf("1", "N", "2").forEach { c ->
-                    BoutonSelection(c, m.marches[c]?.proba,
-                        etat.combi.any { it.matchId == m.id && it.code == c },
-                        Modifier.weight(1f)) { vm.basculer(m, c) }
+                    val code = "1X2:$c"
+                    BoutonSelection(c, vm.proba(m.id, code) ?: m.marches[c]?.proba,
+                        etat.combi.any { it.matchId == m.id && it.code == code },
+                        Modifier.weight(1f)) { vm.basculer(m, code, "1X2 : $c") }
                 }
             }
             val sure = m.selection_haute_confiance
@@ -127,7 +128,7 @@ fun CarteMatch(m: Match, vm: AppViewModel, etat: EtatApp, ouvrir: () -> Unit) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (sure != null) {
                         val c = m.marches[sure]?.confiance
-                        Badge("★ ${Selections.libelle(sure)} · historique ${pct(c?.taux_historique, 0)}", Or)
+                        Badge("★ ${c?.let { m.marches[sure]?.libelle } ?: sure} · historique ${pct(c?.taux_historique, 0)}", Or)
                     }
                     if (m.selections_value.isNotEmpty()) Badge("VALUE", Vert)
                     if (m.pronostiqueurs.isNotEmpty()) Badge("${m.pronostiqueurs.size} expert(s)", couleurs.surfaceVariant, couleurs.onSurface)
