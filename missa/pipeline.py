@@ -94,6 +94,14 @@ class Moteur:
 
     # --- modèles par championnat ----------------------------------------------------------
     def _historique(self, champ: str, d: pd.Timestamp) -> pd.DataFrame | None:
+        if champ in donnees.EXTRA:
+            try:
+                h = donnees.charger_extra(champ, self.cache)
+                return h[h["date"] < d]
+            except Exception:
+                return None
+        if champ not in donnees.CHAMPIONNATS:
+            return None  # compétition sans historique (coupes, sélections) : marché seul
         parts = []
         for s in saisons_precedentes(d):
             try:
@@ -214,7 +222,8 @@ class Moteur:
         champs = []
         for code, g in calendrier.groupby("championnat"):
             matchs = [self.predire_match(r, maintenant) for _, r in g.sort_values("coup_envoi").iterrows()]
-            champs.append({"code": code, "nom": donnees.CHAMPIONNATS.get(code, code),
+            nom = g["nom_championnat"].dropna().iloc[0] if "nom_championnat" in g and g["nom_championnat"].notna().any() else code
+            champs.append({"code": code, "nom": donnees.CHAMPIONNATS.get(code, nom),
                            "matchs": [x for x in matchs if x.get("disponible")]})
         return {"genere_le": datetime.now().isoformat(timespec="seconds"),
                 "avertissement": AVERTISSEMENT, "championnats": champs,

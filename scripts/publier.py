@@ -74,7 +74,8 @@ def cotes_odds_api(sortie: Path) -> tuple[pd.DataFrame | None, dict]:
     info = {"active": bool(cle)}
     if not cle:
         return None, info
-    sports = [x.strip() for x in os.environ.get("ODDS_API_SPORTS", "").split(",") if x.strip()] or odds_api.PAR_DEFAUT
+    choix = os.environ.get("ODDS_API_SPORTS", "").strip()
+    max_sports = int(os.environ.get("ODDS_API_MAX_SPORTS") or 8)
     freq = float(os.environ.get("ODDS_API_FREQUENCE_HEURES") or 24)
     precedent = None
     base = os.environ.get("PUBLICATION_URL", "").rstrip("/")
@@ -90,6 +91,15 @@ def cotes_odds_api(sortie: Path) -> tuple[pd.DataFrame | None, dict]:
     if precedent:
         age = (maintenant - datetime.fromisoformat(precedent["recupere_le"])).total_seconds() / 3600
     if precedent is None or age >= freq:
+        if choix and choix != "auto":
+            sports = [x.strip() for x in choix.split(",") if x.strip()]
+        else:  # automatique : compétitions avec des matchs dans les 48 h (appels gratuits)
+            try:
+                sports = odds_api.choisir_sports(cle, max_sports)
+            except Exception as e:
+                info.setdefault("erreurs", []).append(f"choix automatique : {e}")
+                sports = odds_api.PAR_DEFAUT
+        info["sports_interroges"] = sports
         evenements, restant = {}, None
         for sp in sports:
             if restant is not None and restant < 2:
@@ -111,7 +121,13 @@ def cotes_odds_api(sortie: Path) -> tuple[pd.DataFrame | None, dict]:
         if not champ:
             continue
         noms = set()
-        for s_ in saisons_precedentes(pd.Timestamp.now(), 2):
+        if champ in donnees.EXTRA:
+            try:
+                h = donnees.charger_extra(champ)
+                noms |= set(h.domicile) | set(h.exterieur)
+            except Exception:
+                pass
+        for s_ in ([] if champ in donnees.EXTRA else saisons_precedentes(pd.Timestamp.now(), 2)):
             try:
                 h = donnees.charger_saison(champ, s_)
                 noms |= set(h.domicile) | set(h.exterieur)

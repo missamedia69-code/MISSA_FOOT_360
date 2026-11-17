@@ -81,8 +81,15 @@ L'application lit cette adresse par défaut. Coût : 0 € (quelques minutes d'e
 1. Créer une clé gratuite sur https://the-odds-api.com (500 crédits/mois).
 2. Sur GitHub : *Settings → Secrets and variables → Actions → New repository secret*,
    nom `ODDS_API_KEY`, valeur = la clé.
-3. Facultatif, onglet *Variables* : `ODDS_API_SPORTS` (ex. `soccer_epl,soccer_france_ligue_one`)
-   et `ODDS_API_FREQUENCE_HEURES` (défaut 24).
+3. Facultatif, onglet *Variables* : `ODDS_API_SPORTS` (`auto` par défaut, ou une liste comme
+   `soccer_epl,soccer_france_ligue_one`), `ODDS_API_MAX_SPORTS` (défaut 8) et
+   `ODDS_API_FREQUENCE_HEURES` (défaut 24).
+
+En mode `auto`, le moteur interroge gratuitement la liste des compétitions en cours et des matchs
+des 48 prochaines heures, puis ne dépense des crédits que pour les compétitions qui jouent
+(par ordre de priorité : Ligue des champions, 5 grands championnats, Brésil, Argentine, Mexique…).
+Les championnats sud-américains, mexicain, MLS, etc. utilisent l'historique « extra » de
+football-data ; les coupes et sélections sans historique sont calculées à partir du marché seul.
 
 Chaque appel coûte 2 crédits par championnat (1X2 + plus/moins). Par défaut : 8 championnats une
 fois par jour ≈ 480 crédits/mois, dans l'offre gratuite. Avec une offre payante, mettre par

@@ -29,6 +29,19 @@ CHAMPIONNATS = {
 }
 GRANDS_CHAMPIONNATS = ("E0", "SP1", "I1", "D1", "F1")
 
+# Championnats « extra » de football-data : un fichier par pays, toutes saisons confondues,
+# résultats + cotes de clôture (pas de mi-temps, corners ni cartons).
+EXTRA = {
+    "ARG": "Argentine - Liga Profesional", "AUT": "Autriche - Bundesliga", "BRA": "Brésil - Série A",
+    "CHN": "Chine - Super League", "DNK": "Danemark - Superliga", "FIN": "Finlande - Veikkausliiga",
+    "IRL": "Irlande - Premier Division", "JPN": "Japon - J1 League", "MEX": "Mexique - Liga MX",
+    "NOR": "Norvège - Eliteserien", "POL": "Pologne - Ekstraklasa", "ROU": "Roumanie - Liga 1",
+    "RUS": "Russie - Premier League", "SWE": "Suède - Allsvenskan", "SWZ": "Suisse - Super League",
+    "USA": "États-Unis - MLS",
+}
+CHAMPIONNATS |= EXTRA
+URL_EXTRA = "https://www.football-data.co.uk/new/{code}.csv"
+
 # Ordre de préférence des sources de cotes. Pinnacle est signalé peu fiable dans
 # football-data depuis le 23/07/2025 : on lui préfère alors la moyenne du marché.
 DATE_PINNACLE_PEU_FIABLE = pd.Timestamp("2025-07-23")
@@ -132,6 +145,31 @@ def charger_saison(code: str, saison: str, cache: Path = CACHE) -> pd.DataFrame:
                      ("jaunes_ext", "AY"), ("rouges_dom", "HR"), ("rouges_ext", "AR")):
         out[nom] = pd.to_numeric(df[col], errors="coerce") if col in df.columns else np.nan
     return out.reset_index(drop=True)
+
+
+def charger_extra(code: str, cache: Path = CACHE, annees: int = 3, fraicheur_heures: float = 12) -> pd.DataFrame:
+    """Historique d'un championnat « extra » au format du moteur (dernières `annees` années)."""
+    cache.mkdir(parents=True, exist_ok=True)
+    f = cache / f"{code}_extra.csv"
+    if not f.exists() or time.time() - f.stat().st_mtime > fraicheur_heures * 3600:
+        req = urllib.request.Request(URL_EXTRA.format(code=code), headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=60) as r:
+            f.write_bytes(r.read())
+        time.sleep(1.0)
+    df = pd.read_csv(f, encoding="utf-8-sig", on_bad_lines="skip")
+    df = df.dropna(subset=["Home", "Away", "HG", "AG"])
+    df["date"] = pd.to_datetime(df["Date"], dayfirst=True, format="mixed", errors="coerce")
+    df = df[df["date"] >= pd.Timestamp.now() - pd.Timedelta(days=365 * annees)].dropna(subset=["date"])
+    out = pd.DataFrame({
+        "championnat": code, "saison": df["Season"].astype(str), "date": df["date"],
+        "domicile": df["Home"].str.strip(), "exterieur": df["Away"].str.strip(),
+        "buts_dom": df["HG"].astype(int), "buts_ext": df["AG"].astype(int),
+    })
+    clo = _choisir_cotes(df, ["PSC", "AvgC", "B365C"])
+    for i, s_ in enumerate("HDA"):
+        out[f"clo_{s_}"] = out[f"ouv_{s_}"] = clo[:, i]
+    out["max_H"], out["max_D"], out["max_A"] = (_choisir_cotes(df, ["MaxC"])[:, i] for i in range(3))
+    return out.sort_values("date").reset_index(drop=True)
 
 
 URL_CALENDRIER = "https://www.football-data.co.uk/fixtures.csv"

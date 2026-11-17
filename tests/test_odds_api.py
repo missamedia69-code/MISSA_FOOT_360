@@ -69,3 +69,29 @@ def test_budget_credits(tmp_path, monkeypatch):
     assert json.loads((tmp_path / "cotes_odds_api.json").read_text())["evenements"]["soccer_epl"]
     monkeypatch.delenv("ODDS_API_KEY")
     assert publier.cotes_odds_api(tmp_path) == (None, {"active": False})
+
+
+def test_choix_automatique(monkeypatch):
+    def faux_get(url, params, timeout=30):
+        if url.endswith("/sports/"):
+            return [{"key": k, "group": "Soccer", "active": True, "has_outrights": False}
+                    for k in ("soccer_epl", "soccer_brazil_campeonato", "soccer_mexico_ligamx", "soccer_japan_j_league")] + \
+                   [{"key": "soccer_fifa_world_cup_winner", "group": "Soccer", "active": True, "has_outrights": True}]
+        sport = url.split("/sports/")[1].split("/")[0]
+        return [] if sport == "soccer_epl" else [{"id": "x"}]   # trêve : pas de Premier League
+    monkeypatch.setattr(odds_api, "_get", faux_get)
+    assert odds_api.choisir_sports("cle", max_sports=2) == ["soccer_brazil_campeonato", "soccer_mexico_ligamx"]
+    assert "soccer_japan_j_league" in odds_api.choisir_sports("cle", max_sports=8)
+
+
+def test_competition_sans_historique():
+    evs = {"soccer_uefa_champs_league": [evenement("Real Madrid", "Liverpool", "2099-11-25T20:00:00Z", [2.2, 3.6, 3.2])]}
+    evs["soccer_uefa_champs_league"][0]["sport_title"] = "UEFA Champions League"
+    cal, _ = odds_api.vers_calendrier(evs, {})
+    assert cal.iloc[0].championnat == "soccer_uefa_champs_league"
+    assert cal.iloc[0].nom_championnat == "UEFA Champions League"
+    from missa.pipeline import Moteur
+    r = Moteur().predire(cal)
+    m = r["championnats"][0]["matchs"][0]
+    assert r["championnats"][0]["nom"] == "UEFA Champions League"
+    assert m["methode"] == "Marché" and abs(m["marches"]["1"]["proba"] - 0.42) < 0.03
