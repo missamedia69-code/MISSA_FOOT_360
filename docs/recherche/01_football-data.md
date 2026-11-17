@@ -250,13 +250,66 @@ expliquer un résultat avant de l'utiliser.
 pour le 1X2 ; tester les méthodes sur les données historiques (celle qui donne le meilleur
 Brier/log-loss gagne).
 
+## 19. Favourites Bias in American Point Spreads (2015)
+
+- Le public mise à 60–70 % sur le favori du handicap ; les bookmakers décalent légèrement la ligne
+  contre lui (48 % des favoris couvrent en NFL sur 21 saisons).
+- Cause : « confiance intuitive » — on remplace la question difficile (qui couvre le handicap ?) par
+  une facile (qui gagne ?).
+- Expérience : quand on demande aux gens de prédire **l'écart de score** plutôt que « qui couvre »,
+  la foule devient sage (83 % de bons choix sur des lignes truquées).
+
+**Pour l'appli** : demander aux pronostiqueurs/utilisateurs un **score ou des probabilités** plutôt
+qu'un simple choix 1/N/2 — l'information recueillie est de meilleure qualité.
+
+## 20. Testing the Profitability of Football Power Ratings (2015) — compléments
+
+- Conversion note → probabilité par régression linéaire sur moyennes glissantes de 250 matchs.
+  Graphique fourni : `P(victoire extérieur) = −0,06 × note_match + 0,3038` (R² = 0,854).
+- Tableau complet des seuils de « value » : de 1,00 à 3,00, aucun p < 0,05 ; les rendements montent
+  uniquement parce que les cotes moyennes s'allongent (4,10 → 15,46) = plus de variance.
+- Courbe des profits : power ratings ≈ paris à l'aveugle.
+- Avertissement sur le « data mining » (pourquoi les 700 meilleurs pronostics ?).
+
+## 21. Wisdom of the Crowd (2015) — stratégie de référence
+
+- Sagesse des foules : diversité, indépendance, décentralisation, agrégation → le prix du marché
+  agrège toute l'information. Betfair : corrélation probabilité implicite / réalité r = 0,995.
+- **Marge** d'un marché 1X2 : `M = 1/H + 1/D + 1/A − 1`.
+- **Modèle « marge proportionnelle à la cote »** (n issues, ici n = 3) :
+  `cote_juste = n·O / (n − M·O)` ; ex. 6,25 avec M = 8 % → 7,5 ✔ (vérifié).
+- Test sur 22 318 matchs européens 2012/13–2014/15 (Pinnacle) : parier toutes les cotes justes donne
+  +0,08 % → les cotes justes Pinnacle sont exactes.
+- **Stratégie** : parier la meilleure cote du marché quand elle dépasse la cote juste Pinnacle.
+
+| Avantage sur cote juste > | Paris | Rendement | Avantage moyen |
+|---|---|---|---|
+| 0 % | 22 281 | +3,40 % | 2,23 % |
+| 1 % | 14 837 | +4,60 % | 3,07 % |
+| 2 % | 9 196 | +6,63 % | 4,04 % |
+| 3 % | 5 474 | +8,83 % | 5,11 % |
+| 4 % | 3 243 | +12,70 % | 6,26 % |
+| 5 % | 1 927 | +13,22 % | 7,51 % |
+
+  À l'inverse, les cotes inférieures à la cote juste : −3,08 % sur 44 673 paris.
+  Le rendement réaliste à attendre = colonne « avantage moyen ».
+- Limites : longues périodes de stagnation ; les bookmakers « généreux » limitent les gagnants.
+
+**Pour l'appli** :
+- C'est la base la plus solide : **probabilité de référence = cotes justes d'un bookmaker « sharp »**,
+  puis le modèle mathématique et les pronostiqueurs ne servent qu'à **ajuster** cette référence.
+- Problème : Pinnacle est marqué peu fiable dans football-data depuis juillet 2025 → prévoir une
+  référence alternative (cote moyenne/maximale du marché, bourse type Betfair) et tester laquelle
+  est la mieux calibrée.
+
 ---
 
 ## Synthèse pour la conception
 
 1. **Référence de vérité** = la cote de clôture du marché, sans marge. On mesure tout contre elle.
-2. **Moteur** = probabilités du modèle (à définir avec les autres documentations) → comparaison
-   avec les probabilités du marché → EV, corrigée par le délai avant match.
+2. **Moteur** = point de départ : probabilités justes du marché (sagesse des foules) ; ajustements par
+   le modèle mathématique, le mouvement des cotes et les pronostiqueurs → EV, corrigée par le délai
+   avant match ; recherche de la meilleure cote disponible.
 3. **Pronostiqueurs** = historique horodaté, notés par CLV + test statistique ; poids proportionnel
    à la preuve de talent ; détection des historiques suspects.
 4. **Validation** = backtest saison par saison sans fuite d'information, suivi du CLV en réel,
