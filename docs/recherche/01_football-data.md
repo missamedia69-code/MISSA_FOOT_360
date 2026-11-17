@@ -352,6 +352,72 @@ attendus (au moment du pronostic et à la clôture) et marquer les matchs avec a
 - Un pronostiqueur au CLV très **négatif** est aussi une information (signal inverse).
 - Utiliser le pronostiqueur comme **signal d'ajustement** des probabilités, pas comme « pronostic à suivre ».
 
+## 25. Rating Systems for Fixed Odds Football Match Prediction (ratings.pdf, 2003)
+
+- **Note de supériorité de buts** (forme récente, 6 derniers matchs) :
+  `note_équipe = buts marqués − buts encaissés (6 derniers matchs)` ;
+  `note_match = note_domicile − note_extérieur`.
+- Données : championnats anglais 1993/94–2000/01, 14 002 matchs ; répartition globale
+  46,2 % domicile / 28,1 % nul / 25,7 % extérieur.
+- Régressions (probabilités en %, x = note du match) :
+  - domicile : `y = 1,56x + 46,47` (R² = 0,86)
+  - extérieur : `y = 0,03x² − 1,27x + 23,65` (R² = 0,75)
+  - nul : `y = −0,03x² − 0,29x + 29,48` (R² = 0,39) → le nul est le plus difficile à prédire.
+- Cote juste = 100 / probabilité. Value = cote du bookmaker > cote juste.
+- Test 2001/02 (victoires domicile, meilleure cote) : +2,1 % sur 526 paris ; +10,1 % sur 171 paris pour
+  les notes entre −2 et +2 (paris à l'aveugle : −3,7 %). Petits échantillons → non concluant
+  (cf. article Power Ratings : ces systèmes ne battent pas le marché sur la durée).
+
+**Pour l'appli** : variable simple et utile en entrée du modèle (forme récente), mais pas un modèle
+suffisant à lui seul.
+
+## 26. Using the Wisdom of the Crowd to Find Value (PDF, version mise à jour 2017) — retrait de marge 1X2
+
+Quatre méthodes de retrait de marge testées sur **136 876 matchs** (clôture Pinnacle, 2007–2016,
+410 628 cotes). Rendement en pariant à l'aveugle toutes les cotes « justes » (idéal = 0 %) :
+
+| Méthode | Rendement |
+|---|---|
+| Cotes Pinnacle brutes | −3,36 % |
+| Marge égale | −0,56 % |
+| **Marge proportionnelle à la cote** | **+0,10 %** |
+| Odds ratio | −0,20 % |
+| **Fonction logarithmique (« puissance »)** | **+0,07 %** |
+
+- Marge proportionnelle : `M_i = M·O_fi / n` ; inverse `O_f = n·O / (n − M·O)`. Cote max possible = n/M.
+- Odds ratio : `OR(a,b) = [a/(1−a)] / [b/(1−b)]`, même OR pour chaque issue ; résolu numériquement.
+- Logarithmique / puissance : `p^n + q^n + r^n = 1 + M` avec p,q,r les vraies probabilités ;
+  donc vraie proba `p_i = (1/O_i)^(1/n)`, n trouvé numériquement pour que la somme fasse 1.
+- Test de value (meilleure cote du marché vs cote juste Pinnacle, 37 303 matchs, 22 divisions, 2012–2017) :
+
+| Seuil | Marge prop. (paris / réel / attendu) | Odds ratio | Logarithmique |
+|---|---|---|---|
+| > 0 % | 36 395 / +2,51 % / +2,27 % | 36 529 / +2,36 % / +2,44 % | 36 496 / +2,32 % / +2,31 % |
+| > 2 % | 14 967 / +5,71 % / +4,23 % | 15 213 / +4,47 % / +4,61 % | 15 169 / +5,36 % / +4,28 % |
+| > 5 % | 3 400 / +11,78 % / +7,98 % | 4 038 / +8,84 % / +8,67 % | 3 508 / +13,45 % / +8,10 % |
+
+  La méthode « marge égale » crée de fausses value sur les outsiders (3 957 cas sur 111 909).
+- Conclusion de l'auteur : odds ratio = le plus proche de l'attendu ; logarithmique = le plus
+  cohérent avec la théorie de l'utilité ; marge proportionnelle = le plus simple.
+- ~1/3 des matchs offrent une value ; 60 % de ces value existent même sans arbitrage.
+
+**Pour l'appli** : implémenter les 4 méthodes + Shin, choisir par backtest ;
+par défaut « puissance » (logarithmique) pour le 1X2, Abrams pour les marchés à 2 issues.
+
+## 27. Structure des fichiers football-data (notes.txt + page de téléchargement)
+
+- URL : `https://football-data.co.uk/mmz4281/{SAISON}/{CODE}.csv` ; saison `2526` = 2025/26,
+  `2627` = 2026/27 ; codes : E0 Premier League, E1 Championship, E2 League 1, E3 League 2, EC National
+  League (et équivalents par pays : SP1, I1, D1, F1, N1, B1, P1, T1, G1, SC0…).
+- Résultats : Date, Time, HomeTeam, AwayTeam, FTHG, FTAG, FTR, HTHG, HTAG, HTR.
+- Statistiques : HS/AS (tirs), HST/AST (cadrés), HC/AC (corners), HF/AF, HY/AY, HR/AR,
+  HxG/AxG (xG, récents seulement), Referee.
+- Cotes 1X2 : par bookmaker (B365, PS = Pinnacle, BFE = Betfair Exchange…), Max* et Avg* du marché.
+  **Clôture = même code + « C »** (ex. `PSCH`, `MaxCH`, `AvgCH`, `B365CH`).
+- Over/Under 2,5 : `Max>2.5`, `Avg<2.5`, `P>2.5`… ; handicap asiatique : `AHh`, `MaxAHH`, `AvgAHA`…
+- Cotes « avant clôture » relevées le vendredi après-midi (week-end) et le mardi après-midi (semaine).
+- Le nombre de colonnes varie selon la saison → le code doit gérer les colonnes absentes.
+
 ---
 
 ## Synthèse pour la conception
