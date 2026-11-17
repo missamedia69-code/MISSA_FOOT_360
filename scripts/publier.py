@@ -72,8 +72,6 @@ def cotes_odds_api(sortie: Path) -> tuple[pd.DataFrame | None, dict]:
     """
     cle = os.environ.get("ODDS_API_KEY", "").strip()
     info = {"active": bool(cle)}
-    if not cle:
-        return None, info
     choix = os.environ.get("ODDS_API_SPORTS", "").strip()
     max_sports = int(os.environ.get("ODDS_API_MAX_SPORTS") or 8)
     freq = float(os.environ.get("ODDS_API_FREQUENCE_HEURES") or 24)
@@ -87,10 +85,14 @@ def cotes_odds_api(sortie: Path) -> tuple[pd.DataFrame | None, dict]:
             precedent = None
     maintenant = datetime.now(timezone.utc)
     instantane = precedent
+    if not cle:  # pas de clé : on réutilise les dernières cotes publiées (sans appel à l'API)
+        if not precedent:
+            return None, info
+        info["reutilise"] = True
     age = None
     if precedent:
         age = (maintenant - datetime.fromisoformat(precedent["recupere_le"])).total_seconds() / 3600
-    if precedent is None or age >= freq:
+    if cle and (precedent is None or age >= freq):
         if choix and choix != "auto":
             sports = [x.strip() for x in choix.split(",") if x.strip()]
         else:  # automatique : compétitions avec des matchs dans les 48 h (appels gratuits)

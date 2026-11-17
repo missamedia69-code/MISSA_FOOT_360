@@ -227,7 +227,7 @@ def vers_calendrier(evenements: dict[str, list], equipes: dict[str, list[str]]) 
             dom = apparier(ev["home_team"], equipes.get(champ, []))
             ext = apparier(ev["away_team"], equipes.get(champ, []))
             for brut, trouve in ((ev["home_team"], dom), (ev["away_team"], ext)):
-                if trouve is None:
+                if trouve is None and sport in SPORTS:  # compétitions sans historique : normal
                     inconnus.append(f"{champ}: {brut}")
             ko = pd.Timestamp(ev["commence_time"]).tz_convert("UTC").tz_localize(None)
             lignes.append({"championnat": champ, "nom_championnat": ev.get("sport_title", champ),
