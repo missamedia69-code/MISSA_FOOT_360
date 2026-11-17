@@ -1,0 +1,61 @@
+package com.missa.foot360
+
+import android.content.Context
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.onRoot
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.github.takahirom.roborazzi.captureRoboImage
+import org.junit.Before
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+
+/** Captures d'écran de l'application (données de démonstration), rendues sans téléphone. */
+@RunWith(AndroidJUnit4::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [35], qualifiers = "w400dp-h860dp-xxhdpi")
+class CapturesEcransTest {
+    @Before
+    fun majeur() {
+        ApplicationProvider.getApplicationContext<Context>()
+            .getSharedPreferences("missa", Context.MODE_PRIVATE).edit()
+            .putBoolean("majeur", true).putString("url_api", "http://127.0.0.1:9").commit()
+    }
+
+    @get:Rule
+    val regle = createAndroidComposeRule<MainActivity>()
+
+    private fun attendreDonnees() = regle.waitUntil(20_000) {
+        regle.onAllNodesWithText("Score probable", substring = true).fetchSemanticsNodes().isNotEmpty()
+    }
+
+    @Test
+    fun parcours() {
+        regle.onNodeWithText("J'ai 18 ans ou plus").performClick()
+        attendreDonnees()
+        regle.onRoot().captureRoboImage("../../docs/captures/1_matchs.png")
+        // ajout de deux sélections au combiné
+        regle.onAllNodesWithText("1", useUnmergedTree = true)[0].performClick()
+        regle.onAllNodesWithText("N", useUnmergedTree = true)[1].performClick()
+        regle.waitForIdle()
+        regle.onRoot().captureRoboImage("../../docs/captures/2_combine_barre.png")
+        regle.onNodeWithText("Voir ›").performClick()
+        regle.waitForIdle()
+        regle.onRoot().captureRoboImage("../../docs/captures/3_combine.png")
+        regle.onNodeWithText("Confiance").performClick()
+        regle.waitForIdle()
+        regle.onRoot().captureRoboImage("../../docs/captures/4_haute_confiance.png")
+        regle.onNodeWithText("Matchs").performClick()
+        regle.waitForIdle()
+        attendreDonnees()
+        regle.onNodeWithText("AFC Wimbledon - Blackpool", useUnmergedTree = true).performClick()
+        regle.waitForIdle()
+        regle.onRoot().captureRoboImage("../../docs/captures/5_detail_match.png")
+    }
+}
