@@ -28,8 +28,12 @@ class Depot(private val context: Context) {
 
     data class Chargement(val pronostics: Pronostics, val horsLigne: Boolean, val erreur: String?)
 
+    /** Mode « fichier » : l'adresse pointe vers un pronostics.json publié (GitHub Actions). */
+    private val modeFichier get() = urlApi.endsWith(".json")
+
     private fun get(chemin: String): String {
-        val req = Request.Builder().url(urlApi + chemin).build()
+        val url = if (modeFichier) urlApi.substringBeforeLast('/') + "/" + chemin else urlApi + chemin
+        val req = Request.Builder().url(url).header("Cache-Control", "no-cache").build()
         client.newCall(req).execute().use { r ->
             if (!r.isSuccessful) error("HTTP ${r.code}")
             return r.body?.string() ?: error("Réponse vide")
@@ -38,7 +42,7 @@ class Depot(private val context: Context) {
 
     suspend fun pronostics(): Chargement = withContext(Dispatchers.IO) {
         try {
-            Chargement(json.decodeFromString<Pronostics>(get("/matchs?avec_matrice=true")), false, null)
+            Chargement(json.decodeFromString<Pronostics>(get(if (modeFichier) "pronostics.json" else "/matchs?avec_matrice=true")), false, null)
         } catch (e: Exception) {
             val demo = context.assets.open("demo.json").bufferedReader().use { it.readText() }
             Chargement(json.decodeFromString<Pronostics>(demo), true, e.message)
@@ -47,7 +51,7 @@ class Depot(private val context: Context) {
 
     suspend fun pronostiqueurs(): List<NotePronostiqueur> = withContext(Dispatchers.IO) {
         try {
-            json.decodeFromString<List<NotePronostiqueur>>(get("/pronostiqueurs"))
+            json.decodeFromString<List<NotePronostiqueur>>(get(if (modeFichier) "pronostiqueurs.json" else "/pronostiqueurs"))
         } catch (e: Exception) {
             emptyList()
         }

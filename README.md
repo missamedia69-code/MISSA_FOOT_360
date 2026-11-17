@@ -63,6 +63,19 @@ Après le match, `Stockage().cloturer_match(match_id, {"1x2": [H, N, A]})` enreg
 clôture : le CLV et la note du pronostiqueur sont alors recalculés. Un pronostiqueur n'influence
 les probabilités qu'après 50 pronostics et un t-score de CLV ≥ 2.
 
+## Publication automatique (GitHub Actions)
+
+Le fichier `.github/workflows/pronostics.yml` lance `scripts/publier.py` toutes les 3 heures
+(et à la demande depuis l'onglet « Actions » du dépôt) :
+
+1. import des pronostics d'experts de `data/experts/pronostics.csv` et clôture automatique
+   des matchs joués (CLV) ;
+2. calcul des pronostics des prochains matchs ;
+3. publication sur la branche `pronostics` :
+   `https://raw.githubusercontent.com/missamedia69-code/MISSA_FOOT_360/pronostics/pronostics.json`
+
+L'application lit cette adresse par défaut. Coût : 0 € (quelques minutes d'exécution par jour).
+
 ## Application Android
 
 ```bash

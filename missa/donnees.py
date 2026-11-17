@@ -34,10 +34,21 @@ GRANDS_CHAMPIONNATS = ("E0", "SP1", "I1", "D1", "F1")
 DATE_PINNACLE_PEU_FIABLE = pd.Timestamp("2025-07-23")
 
 
-def telecharger(code: str, saison: str, cache: Path = CACHE, pause: float = 1.5) -> Path:
+def saison_en_cours(d: pd.Timestamp | None = None) -> str:
+    d = d or pd.Timestamp.now()
+    a = d.year % 100
+    return f"{a:02d}{a + 1:02d}" if d.month >= 7 else f"{(a - 1) % 100:02d}{a:02d}"
+
+
+def telecharger(code: str, saison: str, cache: Path = CACHE, pause: float = 1.5,
+                fraicheur_heures: float = 12) -> Path:
+    """Télécharge un fichier de saison (mis en cache). La saison en cours est rafraîchie
+    si le fichier a plus de `fraicheur_heures` heures (nouveaux résultats)."""
     cache.mkdir(parents=True, exist_ok=True)
     f = cache / f"{code}_{saison}.csv"
-    if not f.exists() or f.stat().st_size == 0:
+    perime = (saison == saison_en_cours() and f.exists()
+              and time.time() - f.stat().st_mtime > fraicheur_heures * 3600)
+    if not f.exists() or f.stat().st_size == 0 or perime:
         req = urllib.request.Request(URL.format(saison=saison, code=code),
                                      headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=60) as r:

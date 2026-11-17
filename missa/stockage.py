@@ -96,6 +96,24 @@ class Stockage:
         self.db.commit()
         return n
 
+    def importer_csv(self, chemin) -> dict:
+        """Importe des pronostics d'experts depuis un CSV (colonnes : pronostiqueur, match_id,
+        selection, cote, enregistre_le, coup_envoi — dates ISO). Les lignes enregistrées après
+        le coup d'envoi sont refusées. L'historique Git du fichier sert de preuve d'horodatage."""
+        import csv
+        ok, refus = 0, []
+        with open(chemin, encoding="utf-8") as f:
+            for n, r in enumerate(csv.DictReader(f), start=2):
+                try:
+                    self.ajouter_pronostic(
+                        r["pronostiqueur"].strip(), r["match_id"].strip(), r["selection"].strip(),
+                        float(r["cote"]), datetime.fromisoformat(r["coup_envoi"].strip()),
+                        maintenant=datetime.fromisoformat(r["enregistre_le"].strip()))
+                    ok += 1
+                except Exception as e:  # ligne invalide ou doublon
+                    refus.append(f"ligne {n} : {e}")
+        return {"importes": ok, "refuses": refus}
+
     def pronostics(self, pronostiqueur: str | None = None, match_id: str | None = None) -> list:
         q, args = "SELECT * FROM pronostics WHERE 1=1", []
         if pronostiqueur:

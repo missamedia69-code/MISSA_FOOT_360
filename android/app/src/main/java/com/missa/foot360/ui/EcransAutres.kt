@@ -94,7 +94,7 @@ fun EcranReglages(vm: AppViewModel, etat: EtatApp) {
     Column(Modifier.padding(16.dp)) {
         Text("Réglages", fontSize = 20.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(12.dp))
-        OutlinedTextField(url, { url = it }, label = { Text("Adresse du serveur (API)") },
+        OutlinedTextField(url, { url = it }, label = { Text("Adresse des pronostics (fichier .json publié ou serveur)") },
             singleLine = true, modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(8.dp))
         Button(onClick = { vm.depot.urlApi = url; vm.charger() }) { Text("Enregistrer et recharger") }

@@ -61,7 +61,7 @@ fun EcranMatchs(etat: EtatApp, vm: AppViewModel, ouvrir: (String) -> Unit) {
 
     LazyColumn(contentPadding = PaddingValues(bottom = 90.dp)) {
         if (etat.horsLigne) item {
-            Text("Mode démonstration hors ligne (serveur injoignable) — réglez l'adresse de l'API.",
+            Text("Mode démonstration hors ligne (pronostics injoignables : pas de connexion ?). Données d'exemple.",
                 color = Or, fontSize = 12.sp, modifier = Modifier.padding(12.dp))
         }
         item {

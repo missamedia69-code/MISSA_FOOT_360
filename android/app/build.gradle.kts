@@ -16,7 +16,9 @@ android {
         versionCode = 1
         versionName = "1.0"
         // Adresse de l'API (modifiable dans l'écran Réglages de l'application)
-        buildConfigField("String", "API_PAR_DEFAUT", "\"http://10.0.2.2:8000\"")
+        // Pronostics publiés automatiquement par GitHub Actions (modifiable dans Réglages)
+        buildConfigField("String", "API_PAR_DEFAUT",
+            "\"https://raw.githubusercontent.com/missamedia69-code/MISSA_FOOT_360/pronostics/pronostics.json\"")
     }
     buildTypes {
         release {
