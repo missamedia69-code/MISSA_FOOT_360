@@ -42,15 +42,33 @@ ces paramètres seront **calibrés par backtest** sur nos propres données plut�
 - `Δ = (att_A + déf_A − att_B − déf_B)/2` ; `log λ_A −= γΔ`, `log λ_B += γΔ`.
 - γ optimal : ≈ 0–0,1 (Premier League), 0,15–0,3 (Bundesliga). Appliqué au moment de la prédiction.
 
-## 4. Classements Elo et pi-ratings (paramètres à calibrer)
+## 4. Classements Elo et pi-ratings
 
-- Elo : `E = 1 / (1 + 10^(−(R_dom + HFA − R_ext)/400))` ;
-  `R' = R + K·G·(résultat − E)` avec un multiplicateur G selon l'écart de buts.
-  K, HFA et G seront optimisés par backtest (RPS minimal).
-- Pi-ratings (Constantinou & Fenton) : note domicile et extérieur séparées pour chaque équipe,
-  mises à jour selon l'erreur entre écart de buts attendu et observé (taux d'apprentissage λ, γ) ;
-  paramètres à calibrer par backtest.
-- Usage : variables d'entrée pour le modèle de combinaison (pas de modèle autonome).
+**World Football Elo** (Wikipedia, vérifié) :
+- `R' = R + K·G·(W − We)` ; W = 1 / 0,5 / 0 ; `We = 1 / (10^(−dr/400) + 1)`, dr = écart de notes
+  **+100 pour l'équipe à domicile**.
+- G (écart de buts N) : N ≤ 1 → 1 ; N = 2 → 1,5 ; N ≥ 3 → (11 + N)/8.
+- K (sélections) : 60 Coupe du monde … 20 amicaux. Convergence après ~30 matchs.
+
+**Wunderlich & Memmert 2018 — « Betting Odds Rating System »** (PLOS ONE, vérifié en partie) :
+- ~15 000 matchs (PL, Bundesliga, Liga, Serie A, coupes d'Europe), 2007/08–2016/17.
+- Note de départ 1000, promu = note du relégué remplacé, avantage domicile ω = 80.
+- Probabilités 1X2 = **régression logit ordonnée** sur l'écart de notes (calée sur 3 saisons,
+  testée sur les 5 suivantes).
+- ELO-Résultat (k = 14) < ELO-Buts (k0 = 4, λ = 1,6) < **ELO-Cotes** (k = 175 ; on remplace le
+  résultat par la probabilité implicite des cotes) < **cotes des bookmakers** (meilleures de toutes).
+- Leçon : un Elo nourri par les cotes est plus prédictif qu'un Elo nourri par les résultats, mais
+  ne bat toujours pas le marché.
+
+**Hvattum & Arntzen 2010** (résumé indirect) : Elo + régression logit → meilleur que les modèles
+probit classiques, moins bon que les cotes.
+
+**Pi-ratings** (Constantinou & Fenton 2013) : sources inaccessibles ; à implémenter selon la
+description publique (notes domicile/extérieur séparées, mise à jour selon l'erreur d'écart de buts
+avec rendements décroissants) et **paramètres calibrés par backtest**.
+
+Usage dans l'appli : variables d'entrée du modèle de combinaison, paramètres (K, avantage domicile,
+multiplicateur de buts) optimisés par RPS/log-loss sur des saisons non vues.
 
 ## 5. Évaluation
 
