@@ -194,6 +194,39 @@ probabilité dans le même sens.
 pas contre la cote brute. Un pronostiqueur peut apporter de l'information utile (signal à combiner)
 même s'il n'est pas rentable seul.
 
+## 16. Do Bettors Create their own "Hot Hand" Winning Streaks? (2016)
+
+- Une étude (Xu & Harvey, 565 915 paris) concluait que les parieurs prennent des cotes plus courtes
+  après des gains. Buchdahl montre que c'est un **biais de survivance** : ceux qui parient des cotes
+  courtes ont naturellement des séries plus longues ; et plus on parie, plus la série maximale est longue
+  (Pyckio, ~1 million de pronostics : série max 10 ↔ 575 paris en moyenne, même cotes ~2,0).
+- À l'intérieur d'une série de 6 gains, les cotes ne bougent pas (1,64 → 1,64).
+
+**Pour l'appli** : ne **jamais** utiliser les séries de victoires d'un pronostiqueur comme indicateur
+(« 8 pronos gagnants d'affilée » ne prouve rien). Toujours se demander quel biais de sélection peut
+expliquer un résultat avant de l'utiliser.
+
+## 17. The Favourite–Longshot Bias Revisited (2015)
+
+- Le bookmaker ne répartit pas sa marge également : il la met surtout sur les **outsiders**.
+  Ex. vraies cotes 1,25 / 5,00 → affichées ~1,21 / 4,44 (favori −3 %, outsider −12 %).
+- Conséquence : parier au hasard les cotes < 1,50 rapporte presque l'équilibre ; les cotes > 5,00
+  peuvent rapporter 80 % ou moins.
+- Cause : effets de possibilité et de certitude (Kahneman & Tversky) — les gens surestiment les petites
+  probabilités et sous-estiment les quasi-certitudes ; les bookmakers en profitent.
+- Les **bourses de paris (Betfair)** n'ont presque pas ce biais : sur 52 411 cotes, probabilité implicite
+  ≈ fréquence réelle (graphique quasi sur la diagonale).
+- Ratio de tolérance (probabilité selon la meilleure cote / selon la cote moyenne) : ~0,97 pour un
+  favori à 1,10, ~0,67 pour un outsider à 30. Plus la cote est longue, plus l'écart moyenne/meilleure
+  cote est grand.
+
+**Pour l'appli** :
+- Pour retirer la marge, **ne pas** diviser uniformément : utiliser une méthode qui charge plus les
+  outsiders (marge proportionnelle à la cote, méthode de Shin, ou méthode « puissance »).
+- La **meilleure cote du marché** (colonnes Max de football-data) ou une cote de bourse est plus proche
+  de la vraie probabilité que la cote moyenne, surtout pour les outsiders.
+- Prudence sur les pronostics d'outsiders : c'est là que la marge est la plus forte.
+
 ---
 
 ## Synthèse pour la conception
@@ -207,4 +240,5 @@ même s'il n'est pas rentable seul.
    alertes de sur-apprentissage.
 5. **Signaux supplémentaires** : mouvement des cotes ouverture → clôture ; métriques Brier/log-loss
    comparées au marché ; projection de classement par Monte-Carlo.
-6. **À ignorer** : tendances de séries, avis majoritaire du public, rendements sur petits échantillons.
+6. **Retrait de marge** : méthode non uniforme (Shin / puissance / proportionnelle à la cote).
+7. **À ignorer** : tendances de séries (y compris séries de victoires des pronostiqueurs), avis majoritaire du public, rendements sur petits échantillons.
