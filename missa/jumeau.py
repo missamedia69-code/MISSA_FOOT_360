@@ -277,11 +277,16 @@ class JumeauMatch:
                 "cartons": [round(float(v), 4) for v in self.cartons]}
 
 
-def proba_combine(legs: list[tuple[str, str]], jumeaux: dict[str, JumeauMatch]) -> dict:
-    """legs = [(match_id, sélection), ...] -> probabilité du combiné et détail par match."""
+def proba_combine(legs: list[tuple[str, str]], jumeaux: dict[str, JumeauMatch],
+                  un_par_match: bool = False) -> dict:
+    """legs = [(match_id, sélection), ...] -> probabilité du combiné et détail par match.
+    un_par_match=True applique la règle des bookmakers : une seule sélection par match
+    (les combinés officiels « A & B » comptent pour une sélection)."""
     par_match: dict[str, list[str]] = {}
     for mid, sel in legs:
         par_match.setdefault(mid, []).append(sel)
+    if un_par_match and any(len(v) > 1 for v in par_match.values()):
+        raise ValueError("Une seule sélection par match sur un ticket (règle des bookmakers)")
     detail = {mid: jumeaux[mid].proba(sels) for mid, sels in par_match.items()}
     p = float(np.prod(list(detail.values()))) if detail else 0.0
     return {"proba": p, "cote_juste": 1 / p if p > 0 else None, "par_match": detail,

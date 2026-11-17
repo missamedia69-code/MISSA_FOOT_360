@@ -146,6 +146,7 @@ class JambeIn(BaseModel):
 
 class ProbabiliteIn(BaseModel):
     selections: list[JambeIn]
+    un_par_match: bool = True  # règle des bookmakers ; False = analyse libre
     modulations: dict[str, ModulationIn] = {}
 
 
@@ -170,7 +171,7 @@ def probabilite(q: ProbabiliteIn):
                 J = J.moduler(**q.modulations[s.match_id].model_dump())
             jumeaux[s.match_id] = J
     try:
-        return proba_combine([(s.match_id, s.selection) for s in q.selections], jumeaux)
+        return proba_combine([(s.match_id, s.selection) for s in q.selections], jumeaux, q.un_par_match)
     except (KeyError, ValueError, IndexError) as e:
         raise HTTPException(400, f"Sélection invalide : {e}")
 

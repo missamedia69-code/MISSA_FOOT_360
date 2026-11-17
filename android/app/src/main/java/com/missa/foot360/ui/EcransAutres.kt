@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -101,6 +102,17 @@ fun EcranReglages(vm: AppViewModel, etat: EtatApp) {
         Spacer(Modifier.height(8.dp))
         Text(if (etat.horsLigne) "État : hors ligne (données de démonstration)${etat.erreur?.let { " — $it" } ?: ""}"
             else "État : connecté — pronostics générés le ${etat.pronostics.genere_le}", fontSize = 12.sp)
+        Spacer(Modifier.height(20.dp))
+        Text("Règles du ticket", fontWeight = FontWeight.Bold, color = Vert)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Une seule sélection par match", fontSize = 14.sp)
+                Text(if (etat.unParMatch) "Comme chez les bookmakers (BetPawa…) : une nouvelle option du même match remplace l'ancienne."
+                    else "Analyse libre : plusieurs événements d'un même match (probabilité conjointe). Non jouable tel quel.",
+                    fontSize = 11.sp)
+            }
+            Switch(checked = etat.unParMatch, onCheckedChange = { vm.changerMode(it) })
+        }
         Spacer(Modifier.height(20.dp))
         Text("Jeu responsable", fontWeight = FontWeight.Bold, color = Or)
         Text("Les pronostics sont des probabilités, jamais des certitudes. Ne misez que ce que vous " +

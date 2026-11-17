@@ -45,7 +45,7 @@ fun BarreCombi(etat: EtatApp, ouvrir: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text("Combiné : ${etat.combi.size} sélection(s)", fontSize = 12.sp)
+            Text((if (etat.unParMatch) "Ticket" else "Combiné libre") + " : ${etat.combi.size} sélection(s)", fontSize = 12.sp)
             if (r.proba == 0.0) Text("Sélections incompatibles (probabilité nulle)",
                 fontWeight = FontWeight.Bold, color = Rouge)
             else Text("Probabilité ${pct(r.proba, 2)}  ·  cote juste ${cote(r.coteJuste)}",
@@ -60,7 +60,7 @@ fun EcranCombi(etat: EtatApp, vm: AppViewModel) {
     val r = etat.resultat
     LazyColumn(contentPadding = PaddingValues(16.dp)) {
         item {
-            Text("Mon combiné", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text(if (etat.unParMatch) "Mon ticket" else "Mon combiné (analyse libre)", fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
             Text("La probabilité est recalculée à chaque modification. Saisissez la cote de votre " +
                 "bookmaker pour voir la valeur du combiné.", fontSize = 12.sp)
@@ -118,8 +118,13 @@ fun EcranCombi(etat: EtatApp, vm: AppViewModel) {
                     }
                     Text("Sur 100 combinés identiques, environ ${"%.0f".format(r.proba * 100)} seraient gagnants.",
                         fontSize = 12.sp)
-                    if (r.memeMatch) Text("Plusieurs sélections sur un même match : la corrélation est prise " +
-                        "en compte. Beaucoup de bookmakers refusent ou ajustent ces combinés.", fontSize = 12.sp, color = Or)
+                    if (r.memeMatch) Text("Analyse libre : plusieurs sélections sur un même match (corrélation prise " +
+                        "en compte). Ce ticket ne serait PAS accepté tel quel par un bookmaker.", fontSize = 12.sp, color = Rouge)
+                    val hors = com.missa.foot360.moteur.RegleTicket.horsBonus(etat.combi) { j ->
+                        vm.proba(j.matchId, j.code)?.let { if (it > 0) 1 / it else null } }
+                    if (hors.isNotEmpty()) Text("${hors.size} sélection(s) à moins de 1,10 : en général non prise(s) en " +
+                        "compte pour le bonus de gains.", fontSize = 12.sp, color = Or)
+                    Text("${etat.combi.size} / ${com.missa.foot360.moteur.RegleTicket.MAX_SELECTIONS} sélections.", fontSize = 11.sp)
                     if (r.proba < 0.05 && r.proba > 0) Text("Combiné très improbable (moins de 1 chance sur 20).",
                         fontSize = 12.sp, color = Rouge)
                     if (r.proba == 0.0) Text("Sélections incompatibles entre elles.", fontSize = 12.sp, color = Rouge)

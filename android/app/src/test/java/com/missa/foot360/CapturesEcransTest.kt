@@ -58,6 +58,8 @@ class CapturesEcransTest {
         regle.onNodeWithText("Buts").performScrollTo().performClick()
         regle.waitForIdle()
         regle.onAllNodesWithText("Plus de 1,5", useUnmergedTree = true)[0].performClick()
+        regle.waitForIdle()
+        regle.onRoot().captureRoboImage("../../docs/captures/8_remplacement.png")
         regle.onNodeWithText("Moduler le match", substring = true).performClick()
         regle.waitForIdle()
         regle.onRoot().captureRoboImage("../../docs/captures/4_modulation.png")

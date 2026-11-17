@@ -20,6 +20,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -85,7 +89,13 @@ fun Application(vm: AppViewModel) {
         )
     }
 
+    val snack = remember { SnackbarHostState() }
+    LaunchedEffect(etat.message) {
+        etat.message?.let { snack.showSnackbar(it, duration = SnackbarDuration.Short); vm.messageVu() }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snack) },
         topBar = {
             TopAppBar(
                 title = { Text("MISSA FOOT 360", fontWeight = FontWeight.Bold, color = Vert) },

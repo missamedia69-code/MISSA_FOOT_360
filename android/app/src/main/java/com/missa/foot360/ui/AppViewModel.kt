@@ -12,6 +12,7 @@ import com.missa.foot360.moteur.JambeCombine
 import com.missa.foot360.moteur.Jumeau
 import com.missa.foot360.moteur.Modulation
 import com.missa.foot360.moteur.ParamsJumeau
+import com.missa.foot360.moteur.RegleTicket
 import com.missa.foot360.moteur.ResultatCombine
 import com.missa.foot360.moteur.calculerCombine
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,6 +31,8 @@ data class EtatApp(
     val resultat: ResultatCombine? = null,
     val modulations: Map<String, Modulation> = emptyMap(),
     val bonus: Double = 0.0,
+    val unParMatch: Boolean = true,
+    val message: String? = null,
 ) {
     val matchs: Map<String, Match> by lazy {
         pronostics.championnats.flatMap { it.matchs }.associateBy { it.id }
@@ -56,7 +59,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val etat: StateFlow<EtatApp> = _etat.asStateFlow()
     private val cacheJumeaux = HashMap<Pair<String, Modulation>, Jumeau>()
 
-    init { charger() }
+    init {
+        _etat.update { it.copy(unParMatch = !depot.plusieursParMatch) }
+        charger()
+    }
+
+    fun messageVu() = _etat.update { it.copy(message = null) }
+
+    /** Mode ticket (une sélection par match, comme chez le bookmaker) ou analyse libre. */
+    fun changerMode(unParMatch: Boolean) {
+        depot.plusieursParMatch = !unParMatch
+        _etat.update { e ->
+            val t = if (unParMatch) RegleTicket.normaliser(e.combi) else e.combi
+            e.copy(unParMatch = unParMatch, combi = t,
+                message = if (unParMatch && t.size < e.combi.size) "Ticket corrigé : une seule sélection gardée par match." else null)
+        }
+        recalculer()
+    }
 
     fun charger() = viewModelScope.launch {
         _etat.update { it.copy(chargement = true) }
@@ -91,20 +110,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun estSelectionne(matchId: String, code: String) =
         _etat.value.combi.any { it.matchId == matchId && it.code == code }
 
-    /** Ajoute ou retire une sélection : la probabilité du combiné est recalculée immédiatement. */
+    /** Ajoute ou retire une sélection en respectant les règles du ticket ; recalcul immédiat. */
     fun basculer(match: Match, code: String, libelle: String) {
         _etat.update { e ->
-            val existe = e.combi.any { it.matchId == match.id && it.code == code }
-            val nouvelle = if (existe) e.combi.filterNot { it.matchId == match.id && it.code == code }
-            else e.combi + JambeCombine(match.id, code, "${match.domicile} - ${match.exterieur}", libelle)
-            e.copy(combi = nouvelle)
+            val r = RegleTicket.basculer(e.combi,
+                JambeCombine(match.id, code, "${match.domicile} - ${match.exterieur}", libelle), e.unParMatch)
+            e.copy(combi = r.ticket, message = r.message)
         }
         recalculer()
     }
 
     fun ajouterPlusieurs(jambes: List<JambeCombine>) {
         _etat.update { e ->
-            e.copy(combi = e.combi + jambes.filter { j -> e.combi.none { it.matchId == j.matchId && it.code == j.code } })
+            val r = RegleTicket.ajouterPlusieurs(e.combi, jambes, e.unParMatch)
+            e.copy(combi = r.ticket, message = r.message)
         }
         recalculer()
     }

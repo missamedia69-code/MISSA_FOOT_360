@@ -63,3 +63,11 @@ def test_probabilite_jumeau(client):
     assert mod["proba"] < base["proba"]
     assert client.post("/probabilite", json={"selections": [
         {"match_id": "m1", "selection": "INCONNU:1"}]}).status_code == 400
+
+
+def test_un_pari_par_match(client):
+    deux = [{"match_id": "m1", "selection": "1X2:1"}, {"match_id": "m1", "selection": "BTTS:oui"}]
+    assert client.post("/probabilite", json={"selections": deux}).status_code == 400
+    assert client.post("/probabilite", json={"selections": deux, "un_par_match": False}).status_code == 200
+    officiel = [{"match_id": "m1", "selection": "1X2:1 & BTTS:oui"}]
+    assert client.post("/probabilite", json={"selections": officiel}).status_code == 200

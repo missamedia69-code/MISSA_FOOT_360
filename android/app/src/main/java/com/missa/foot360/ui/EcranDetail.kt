@@ -55,8 +55,12 @@ fun EcranDetail(m: Match?, etat: EtatApp, vm: AppViewModel) {
                 val bd = j?.let { (0 until it.matrice.size).sumOf { i -> i * it.matrice[i].sum() } }
                 val be = j?.let { (0 until it.matrice.size).sumOf { k -> k * it.matrice.sumOf { r -> r[k] } } }
                 Text("Buts attendus : ${cote(bd)} - ${cote(be)}  ·  Corners : ${m.corners_attendus.joinToString(" - ") { cote(it) }}  ·  Cartons : ${m.cartons_attendus.joinToString(" - ") { cote(it) }}", fontSize = 13.sp)
-                Text("Touchez une option pour l'ajouter au combiné. Plusieurs options d'un même match = probabilité conjointe exacte.",
-                    fontSize = 12.sp, color = Vert)
+                Text(if (etat.unParMatch)
+                    "Touchez une option pour l'ajouter au ticket. Une seule sélection par match (règle des bookmakers) : " +
+                        "pour combiner plusieurs événements du même match, utilisez l'onglet « Combinés officiels »."
+                else "Mode analyse libre : plusieurs options d'un même match = probabilité conjointe exacte " +
+                    "(non jouable tel quel chez un bookmaker).",
+                    fontSize = 12.sp, color = if (etat.unParMatch) Vert else Or)
                 TextButton(onClick = { voirModulation = !voirModulation }) {
                     Text(if (mod.neutre) "⚙ Moduler le match (absences, forme, arbitre…)" else "⚙ Modulation active — modifier")
                 }

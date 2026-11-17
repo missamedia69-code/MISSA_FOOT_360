@@ -85,3 +85,9 @@ def test_combine_plusieurs_matchs(J):
     r = proba_combine([("a", "1X2:1"), ("b", "BTTS:oui"), ("a", "OU:1.5:plus")], {"a": J, "b": J})
     assert r["proba"] == pytest.approx(J.proba("1X2:1 & OU:1.5:plus") * J.proba("BTTS:oui"))
     assert r["meme_match"]
+
+
+def test_regle_un_par_match(J):
+    with pytest.raises(ValueError):
+        proba_combine([("a", "1X2:1"), ("a", "BTTS:oui")], {"a": J}, un_par_match=True)
+    assert proba_combine([("a", "1X2:1 & BTTS:oui")], {"a": J}, un_par_match=True)["proba"] > 0

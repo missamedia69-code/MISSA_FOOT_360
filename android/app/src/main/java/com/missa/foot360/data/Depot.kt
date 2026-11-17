@@ -22,6 +22,11 @@ class Depot(private val context: Context) {
         get() = prefs.getString("url_api", BuildConfig.API_PAR_DEFAUT) ?: BuildConfig.API_PAR_DEFAUT
         set(v) = prefs.edit().putString("url_api", v.trim().trimEnd('/')).apply()
 
+    /** Mode « analyse libre » : plusieurs sélections par match (non jouable chez un bookmaker). */
+    var plusieursParMatch: Boolean
+        get() = prefs.getBoolean("plusieurs_par_match", false)
+        set(v) = prefs.edit().putBoolean("plusieurs_par_match", v).apply()
+
     var majeurConfirme: Boolean
         get() = prefs.getBoolean("majeur", false)
         set(v) = prefs.edit().putBoolean("majeur", v).apply()
