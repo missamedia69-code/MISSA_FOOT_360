@@ -22,6 +22,7 @@ class DixonColes:
     xi: float = XI_DEFAUT
     max_buts: int = 10
     penalite: float = 1e-3  # légère régularisation L2 (équipes avec peu de matchs)
+    rho_fixe: float | None = None  # 0 pour des comptages sans correction (corners, cartons)
     equipes: list = field(default_factory=list)
     attaque: np.ndarray | None = None
     defense: np.ndarray | None = None
@@ -29,7 +30,7 @@ class DixonColes:
     rho: float = -0.1
 
     def ajuster(self, matchs: pd.DataFrame, date_ref: pd.Timestamp) -> "DixonColes":
-        m = matchs[matchs["date"] < date_ref]
+        m = matchs[matchs["date"] < date_ref].dropna(subset=["buts_dom", "buts_ext"])
         self.equipes = sorted(set(m["domicile"]) | set(m["exterieur"]))
         idx = {e: i for i, e in enumerate(self.equipes)}
         n = len(self.equipes)
@@ -85,7 +86,9 @@ class DixonColes:
 
         theta0 = np.zeros(2 * n + 2)
         theta0[2 * n], theta0[2 * n + 1] = 0.25, -0.05
-        bornes = [(-3, 3)] * (2 * n) + [(-1, 1), (-0.3, 0.3)]
+        r = (self.rho_fixe, self.rho_fixe) if self.rho_fixe is not None else (-0.3, 0.3)
+        theta0[2 * n + 1] = 0.0 if self.rho_fixe is not None else theta0[2 * n + 1]
+        bornes = [(-3, 3)] * (2 * n) + [(-1, 1), r]
         res = minimize(nll, theta0, jac=True, method="L-BFGS-B", bounds=bornes)
         th = res.x
         self.attaque, self.defense = th[:n], th[n:2 * n]

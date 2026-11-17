@@ -116,7 +116,9 @@ def charger_saison(code: str, saison: str, cache: Path = CACHE) -> pd.DataFrame:
     })
     out = out.join(extraire_cotes(df, df["date"]))
     for nom, col in (("tirs_dom", "HS"), ("tirs_ext", "AS"), ("cadres_dom", "HST"),
-                     ("cadres_ext", "AST")):
+                     ("cadres_ext", "AST"), ("mt_dom", "HTHG"), ("mt_ext", "HTAG"),
+                     ("corners_dom", "HC"), ("corners_ext", "AC"), ("jaunes_dom", "HY"),
+                     ("jaunes_ext", "AY"), ("rouges_dom", "HR"), ("rouges_ext", "AR")):
         out[nom] = pd.to_numeric(df[col], errors="coerce") if col in df.columns else np.nan
     return out.reset_index(drop=True)
 

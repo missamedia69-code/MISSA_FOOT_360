@@ -20,11 +20,12 @@ import pandas as pd
 from scipy.optimize import minimize
 from scipy.stats import poisson
 
-from . import confiance, donnees, marge, valeur
+from . import comptages, confiance, donnees, marge, valeur
 from .backtest import LogitOrdonne
 from .combinaison import PoolLogarithmique
 from .dixon_coles import DixonColes, matrice_scores
 from .elo import Elo
+from .jumeau import JumeauMatch, catalogue
 from .pronostiqueurs import ajuster_matrice as ajuster_par_pronostiqueurs
 from .selections import SELECTIONS, ajuster_matrice, libelle, proba_selection
 
@@ -87,6 +88,9 @@ class Moteur:
             self.logit = LogitOrdonne()
             self.logit.b, self.logit.c1, self.logit.c2 = (cfg["elo_logit"][k] for k in ("b", "c1", "c2"))
         self._modeles: dict = {}
+        self.params_jumeau = cfg.get("jumeau", {})
+        f = RACINE / "data" / "fiabilite_marches.json"
+        self.fiabilite = json.loads(f.read_text())["familles"] if f.exists() else {}
 
     # --- modèles par championnat ----------------------------------------------------------
     def _historique(self, champ: str, d: pd.Timestamp) -> pd.DataFrame | None:
@@ -116,13 +120,15 @@ class Moteur:
                         elo.nouvelle_saison(set(h.loc[h["saison"] == saison, "domicile"]))
                     elo.mettre_a_jour(r["domicile"], r["exterieur"], int(r["buts_dom"]),
                                       int(r["buts_ext"]))
-            self._modeles[cle] = (dc, elo)
+            corners = comptages.ajuster(h, "corners", d) if h is not None else None
+            cartons = comptages.ajuster(h, "cartons", d) if h is not None else None
+            self._modeles[cle] = (dc, elo, corners, cartons)
         return self._modeles[cle]
 
     # --- un match -----------------------------------------------------------------------------
     def predire_match(self, m: pd.Series, maintenant: datetime | None = None) -> dict:
         champ, d = m["championnat"], pd.Timestamp(m["date"])
-        dc, elo = self.modeles(champ, d)
+        dc, elo, mod_corners, mod_cartons = self.modeles(champ, d)
         mid = identifiant(champ, d, m["domicile"], m["exterieur"])
         sources = {}
         p_marche = marge.probabilites([m.get("ouv_H"), m.get("ouv_D"), m.get("ouv_A")], "puissance")
@@ -175,6 +181,13 @@ class Moteur:
                 e["confiance"] = confiance.niveau(self.calibration, FAMILLE_DE[code], p)
             marches[code] = e
 
+        pj = self.params_jumeau
+        cm = comptages.moyennes(mod_corners, m["domicile"], m["exterieur"], (5.3, 4.4))
+        ym = comptages.moyennes(mod_cartons, m["domicile"], m["exterieur"], (1.9, 2.1))
+        jumeau = JumeauMatch(P, tuple(pj.get("part_1mt", (0.418, 0.0086))),
+                             (cm[0], cm[1], pj.get("corners_k_total", 56.0), pj.get("corners_rho", 0.087)),
+                             (ym[0], ym[1], pj.get("cartons_cov", 0.33)))
+
         i, j = np.unravel_index(P.argmax(), P.shape)
         principal = max(("1", "N", "2"), key=lambda c: marches[c]["proba"])
         candidats = [c for c in marches if marches[c].get("confiance", {}).get("haute_confiance")]
@@ -191,6 +204,9 @@ class Moteur:
             "selection_haute_confiance": sure, "selections_value": values,
             "marches": marches, "pronostiqueurs": avis,
             "matrice": np.round(P, 5).tolist(),
+            "jumeau": jumeau.vers_json(),
+            "corners_attendus": [round(cm[0], 2), round(cm[1], 2)],
+            "cartons_attendus": [round(ym[0], 2), round(ym[1], 2)],
         }
 
     # --- une journée ---------------------------------------------------------------------------
@@ -201,4 +217,7 @@ class Moteur:
             champs.append({"code": code, "nom": donnees.CHAMPIONNATS.get(code, code),
                            "matchs": [x for x in matchs if x.get("disponible")]})
         return {"genere_le": datetime.now().isoformat(timespec="seconds"),
-                "avertissement": AVERTISSEMENT, "championnats": champs}
+                "avertissement": AVERTISSEMENT, "championnats": champs,
+                "catalogue": [{"groupe": g, "titre": t, "options": [{"code": c, "libelle": l} for c, l in o]}
+                              for g, t, o in catalogue()],
+                "fiabilite": self.fiabilite}

@@ -27,6 +27,7 @@ RACINE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RACINE))
 
 from missa import confiance  # noqa: E402
+from missa.jumeau import JumeauMatch, proba_combine  # noqa: E402
 from missa.selections import SELECTIONS, Selection, libelle, proba_combinaison  # noqa: E402
 from missa.stockage import Stockage  # noqa: E402
 
@@ -128,6 +129,55 @@ def combinaison(c: CombinaisonIn):
     r["libelles"] = [f"{tm[s.match_id]['domicile']} - {tm[s.match_id]['exterieur']} : "
                      f"{libelle(s.selection)}" for s in c.selections]
     return r
+
+
+class ModulationIn(BaseModel):
+    attaque_dom: float = Field(1.0, ge=0.3, le=2.0)
+    attaque_ext: float = Field(1.0, ge=0.3, le=2.0)
+    corners_dom: float = Field(1.0, ge=0.3, le=2.0)
+    corners_ext: float = Field(1.0, ge=0.3, le=2.0)
+    cartons: float = Field(1.0, ge=0.3, le=2.5)
+
+
+class JambeIn(BaseModel):
+    match_id: str
+    selection: str  # ex. « 1X2:1 », « DC:1N & OU:3.5:moins », « CORNERS_OU:9.5:plus »
+
+
+class ProbabiliteIn(BaseModel):
+    selections: list[JambeIn]
+    modulations: dict[str, ModulationIn] = {}
+
+
+def jumeau_de(m: dict) -> JumeauMatch:
+    j = m["jumeau"]
+    return JumeauMatch(np.array(j["matrice"]), tuple(j["part_1mt"]), tuple(j["corners"]), tuple(j["cartons"]))
+
+
+@app.post("/probabilite")
+def probabilite(q: ProbabiliteIn):
+    """Probabilité de n'importe quelle sélection ou combinaison, avec modulations éventuelles."""
+    if not q.selections:
+        raise HTTPException(400, "Aucune sélection")
+    tm = tous_les_matchs()
+    jumeaux = {}
+    for s in q.selections:
+        if s.match_id not in tm or "jumeau" not in tm[s.match_id]:
+            raise HTTPException(404, f"Match introuvable : {s.match_id}")
+        if s.match_id not in jumeaux:
+            J = jumeau_de(tm[s.match_id])
+            if s.match_id in q.modulations:
+                J = J.moduler(**q.modulations[s.match_id].model_dump())
+            jumeaux[s.match_id] = J
+    try:
+        return proba_combine([(s.match_id, s.selection) for s in q.selections], jumeaux)
+    except (KeyError, ValueError, IndexError) as e:
+        raise HTTPException(400, f"Sélection invalide : {e}")
+
+
+@app.get("/catalogue")
+def catalogue_marches():
+    return donnees().get("catalogue", [])
 
 
 @app.get("/confiance")
