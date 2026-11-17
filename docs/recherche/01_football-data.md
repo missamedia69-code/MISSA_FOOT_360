@@ -133,6 +133,67 @@ avec la cote proposée, et ne jamais les modifier ensuite.
 
 **Pour l'appli** : ne pas utiliser des tendances du type « telle équipe couvre souvent son handicap ».
 
+## 11. Using Pinnacle's Closing Line to Predict Profits (2016)
+
+- 87 960 paires (cote avant clôture, cote de clôture Pinnacle), 2012/13–2015/16.
+- Rendement attendu = `cote_jouée / cote_clôture − 1`. Rendement réel vs attendu :
+  **pente 1,0025, R² = 0,952** → relation quasi parfaite 1 pour 1.
+- L'écart constant (~4 %) correspond à la marge du bookmaker (non retirée ici).
+
+**Pour l'appli** : le CLV est un prédicteur fiable du rendement futur ; c'est notre indicateur n°1
+(pour le modèle comme pour les pronostiqueurs).
+
+## 12. How Unpredictable was the 2015/16 Premier League? (2016)
+
+- **Score de Brier** (1X2) : `(p_dom − o_dom)² + (p_nul − o_nul)² + (p_ext − o_ext)²`, o = 1 si l'issue
+  s'est produite, 0 sinon. Va de 0 (parfait) à 2. Pronostic au hasard (1/3 partout) = 0,667.
+  Moyenne Premier League 2015/16 avec les cotes du marché : 0,620.
+- Limite : le Brier moyen ne capte pas bien la « surprise » (tout prédire domicile donne 0,512).
+- **Points attendus** d'un match : `3·p_victoire + 1·p_nul`. Somme sur la saison → classement attendu.
+- **Score d'imprévisibilité** = écart-type de (points réels − points attendus) sur les 20 équipes ;
+  ~4,5 à 8 en temps normal, 10,3 en 2015/16 (événement « 1 sur 200 ans », Monte-Carlo 100 000 tirages).
+
+**Pour l'appli** :
+- Métriques d'évaluation du modèle : Brier score (+ log-loss), comparés au Brier des cotes du marché.
+  Notre modèle doit faire **au moins aussi bien que le marché** sinon il n'apporte rien.
+- Fonction « classement projeté » : points attendus + simulation Monte-Carlo de fin de saison.
+
+## 13. Betting Psychology & the Addictive Power of Maybe (2017)
+
+- La plupart des parieurs perdent mais se croient meilleurs que la moyenne (excès de confiance).
+- Illusion de causalité : on attribue un gain à son talent alors que c'est le hasard.
+- La dopamine réagit à l'**incertitude** de la récompense → mécanisme d'addiction.
+
+**Pour l'appli** : présenter des probabilités (jamais de « prono sûr »), afficher l'historique honnête
+(gains **et** pertes), message de jeu responsable + liens d'aide.
+
+## 14. Steamers and Drifters (2016) — le mouvement des cotes est un signal
+
+- 10 180 matchs anglais, 30 540 cotes, 2010/11–2014/15 ; moyennes du marché (avant clôture vs clôture).
+- Une cote qui baisse (steamer) ne baisse **pas assez** ; une cote qui monte (drifter) ne monte
+  **pas assez**. Même à la clôture, le marché n'est pas totalement efficace.
+- Rendement à la cote de clôture **sans marge** : steamers **+3,40 %**, drifters **−1,90 %**
+  (p = 0,002). Effet stable sur 5 saisons.
+- Parier toutes les cotes ayant baissé de plus de 10 % à la clôture moyenne : +7,5 % sur 597 paris
+  (p ≈ 0,02) — échantillon trop petit pour conclure.
+
+**Pour l'appli** : le **mouvement de cote** (ouverture → clôture, disponible dans football-data
+depuis 2019/20) est une variable à intégrer : le sens et l'ampleur du mouvement ajustent la
+probabilité dans le même sens.
+
+## 15. Do Tipsters Beat the Odds in a Betting Market? (2016)
+
+- 48 pronostiqueurs tennis, 7 170 paris : 59,1 % des cotes conseillées battent la clôture,
+  79 % des pronostiqueurs la battent plus d'une fois sur deux.
+- Mais contre la cote de clôture **sans marge** : seulement 44,7 % la battent, rendement attendu
+  −0,90 % ≈ rendement réel −0,94 %. Aucun pronostiqueur significativement gagnant.
+- Les distributions (cote conseillée / cote de clôture) sont plus resserrées et décalées au-dessus de 1
+  que le hasard : ils apportent de l'information, mais pas assez pour battre la marge.
+
+**Pour l'appli** : noter les pronostiqueurs contre la cote de clôture **sans marge** (cote juste),
+pas contre la cote brute. Un pronostiqueur peut apporter de l'information utile (signal à combiner)
+même s'il n'est pas rentable seul.
+
 ---
 
 ## Synthèse pour la conception
@@ -144,4 +205,6 @@ avec la cote proposée, et ne jamais les modifier ensuite.
    à la preuve de talent ; détection des historiques suspects.
 4. **Validation** = backtest saison par saison sans fuite d'information, suivi du CLV en réel,
    alertes de sur-apprentissage.
-5. **À ignorer** : tendances de séries, avis majoritaire du public, rendements sur petits échantillons.
+5. **Signaux supplémentaires** : mouvement des cotes ouverture → clôture ; métriques Brier/log-loss
+   comparées au marché ; projection de classement par Monte-Carlo.
+6. **À ignorer** : tendances de séries, avis majoritaire du public, rendements sur petits échantillons.
