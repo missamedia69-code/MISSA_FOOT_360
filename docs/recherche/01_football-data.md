@@ -302,6 +302,56 @@ qu'un simple choix 1/N/2 — l'information recueillie est de meilleure qualité.
   référence alternative (cote moyenne/maximale du marché, bourse type Betfair) et tester laquelle
   est la mieux calibrée.
 
+## 22. True expected profit for the Wisdom of the Crowd system (2022)
+
+- 26 960 paris 1X2 (ligues européennes, depuis 2012/13, seuil EV ≥ 2 %, cote moyenne 3,83).
+  Rendement réel +4,90 % ; attendu selon la cote Pinnacle **au moment du pari** +4,13 % ;
+  attendu selon la cote Pinnacle **de clôture** +2,88 %.
+- Environ **un tiers** des paris « value » perdent toute leur valeur à la clôture.
+- Réel vs attendu-au-moment-du-pari : p = 0,47 (aucune différence) ; réel vs attendu-clôture : p = 0,05.
+- Hypothèse : les matchs « value » sont souvent des matchs d'**arbitrage** (48,8 % à 2 % de seuil,
+  73 % à 5 %, contre 19 % en général) ; l'argent des arbitragistes déforme la clôture Pinnacle,
+  qui devient moins fiable sur ces matchs-là.
+
+**Pour l'appli** : la clôture reste la meilleure référence **en moyenne**, mais calculer les deux
+attendus (au moment du pronostic et à la clôture) et marquer les matchs avec arbitrage possible.
+
+## 23. Is Sports Betting Completely Random? (2015)
+
+- Pyckio : 1 073 029 pronostics, 6 044 pronostiqueurs, tous chez Pinnacle, cote moyenne 1,99.
+  Rendement global −2,17 % ; simulation au hasard −2,27 % (p = 0,47) → **identique au hasard**.
+- 35,4 % des pronostiqueurs gagnants (41,6 % dans la simulation au hasard).
+- t-scores (records > 30 paris) : distribution normale, écart-type 1,035 vs 1,027 au hasard.
+  Records « 1 chance sur 100 » : 45 observés contre 38 attendus par hasard (p = 0,25).
+- Un record aléatoire de 143 paris a atteint « 1 chance sur 172 000 » → avec assez de joueurs,
+  tout arrive par hasard.
+- Records > 1 000 paris : léger excédent de gagnants, mais biais de survivance (ceux qui perdent
+  arrêtent avant 1 000).
+- Les sports « de niche » ne sont pas plus faciles chez Pinnacle (−2,11 % vs −2,18 %).
+- Utiliser des **mises égales** pour juger (les staking variables servent à manipuler les stats).
+- t-test peu fiable sous 30 paris.
+
+## 24. All Monkeys Are Throwing Darts. But Some Monkeys Are Better Than Others (2023) — clé
+
+- Les **profits** ne persistent pas : t-score des profits 1re moitié vs 2de moitié → corrélation ≈ 0
+  (887 pronostiqueurs, ≥ 200 paris).
+- Le **CLV persiste** : t-score CLV 1re moitié vs 2de moitié → `y = 0,706·x`, **R² = 0,5**,
+  probabilité de hasard ≈ 0. Le talent existe et se mesure par le CLV.
+- La variance des profits est **75 fois** celle du CLV → la chance explique presque toute la variance
+  des résultats. Le CLV détecte le talent en **50 à 100 paris** au lieu de milliers.
+- Distribution des t-scores CLV (1 525 pronostiqueurs) bien plus large que le hasard : des très bons
+  et des très mauvais (pires que le hasard → biais cognitifs).
+- Mais seuls **60 sur 1 525** ont un CLV rentable (après marge ~3 %), et ~1 % de façon significative.
+- Corrélation CLV → profit futur : faible (R² = 6 %) mais significative.
+- Même pour les 60 meilleurs, les profits 1re/2de moitié ne sont corrélés qu'à 8 %.
+
+**Pour l'appli (système de notation des pronostiqueurs)** :
+- Score = **t-score du CLV** (contre la cote de clôture sans marge), mises égales, minimum ~50 pronostics.
+- Prévision du talent futur = t-score passé × ~0,7 (régression vers la moyenne observée).
+- Ne jamais classer par profit, ROI, taux de réussite ou séries.
+- Un pronostiqueur au CLV très **négatif** est aussi une information (signal inverse).
+- Utiliser le pronostiqueur comme **signal d'ajustement** des probabilités, pas comme « pronostic à suivre ».
+
 ---
 
 ## Synthèse pour la conception
@@ -310,8 +360,9 @@ qu'un simple choix 1/N/2 — l'information recueillie est de meilleure qualité.
 2. **Moteur** = point de départ : probabilités justes du marché (sagesse des foules) ; ajustements par
    le modèle mathématique, le mouvement des cotes et les pronostiqueurs → EV, corrigée par le délai
    avant match ; recherche de la meilleure cote disponible.
-3. **Pronostiqueurs** = historique horodaté, notés par CLV + test statistique ; poids proportionnel
-   à la preuve de talent ; détection des historiques suspects.
+3. **Pronostiqueurs** = historique horodaté, notés par t-score du CLV (min. ~50 pronos, mises égales),
+   talent futur ≈ 0,7 × talent passé ; poids proportionnel à la preuve ; détection des historiques
+   suspects ; jamais de classement par profit/réussite/séries.
 4. **Validation** = backtest saison par saison sans fuite d'information, suivi du CLV en réel,
    alertes de sur-apprentissage.
 5. **Signaux supplémentaires** : mouvement des cotes ouverture → clôture ; métriques Brier/log-loss
