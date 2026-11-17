@@ -85,3 +85,26 @@ multiplicateur de buts) optimisés par RPS/log-loss sur des saisons non vues.
   logistique sur les log-cotes du marché, du modèle, des pronostiqueurs, du mouvement des cotes).
 - Le marché doit avoir le poids principal ; les autres sources n'ajustent qu'à la marge,
   avec des poids appris sur des saisons passées puis validés sur des saisons non vues.
+
+## 7. Ce que dit la littérature scientifique (synthèse des recherches)
+
+- **Le marché gagne** : dans toutes les comparaisons propres trouvées, les probabilités issues des cotes
+  battent les modèles (Egidi et al. 2018 : probabilité moyenne de la bonne issue, Premier League
+  modèle 0,4349 vs cotes Shin 0,4516 ; Clegg et al. 2026 : RPS modèle 0,1325 vs Betfair 0,1281).
+- **Meilleurs modèles sur les seuls résultats** : gradient boosting (CatBoost) sur des **pi-ratings**
+  (revue Bunker et al. 2024 ; Soccer Prediction Challenge 2023).
+- **Retrait de marge — méthode de Shin** (Štrumbelj 2014 : la meilleure globalement, selon Egidi) :
+  `π_i(z) = [√(z² + 4(1−z)·o_i²/Σo_j) − z] / [2(1−z)]`, o_i = 1/cote_i ; z (part d'initiés)
+  trouvé numériquement pour que Σπ_i = 1.
+  Une étude 2026 (Goto et al., 90 014 matchs) propose une correction favori/outsider apprise sur
+  l'historique, meilleure que Shin et puissance → à tester.
+- **Combinaison modèle + marché** : Egidi et al. — taux de buts = combinaison convexe des paramètres
+  historiques et des taux implicites des cotes (modèle de Poisson hiérarchique).
+- **Décorrélation** (Hubáček & Šír 2020) : pour gagner de l'argent, il ne suffit pas d'être précis ;
+  il faut que nos erreurs soient **différentes** de celles du marché. → Les ajustements doivent
+  apporter de l'information que le marché n'a pas (pronostiqueurs à fort CLV, mouvements de cotes).
+- **Évaluation** : Wheatcroft 2019 montre que le RPS peut mal classer les prévisions ; le score
+  logarithmique (log-loss / « ignorance ») est plus discriminant → rapporter **log-loss + RPS + Brier**.
+- **Prudence** sur les ROI annoncés dans les articles : échantillons petits, cotes parfois non
+  réellement disponibles (Clegg : ROI +1 %, intervalle −3,8 % à +5,9 %).
+- Les prédictions des foules sur réseaux sociaux s'approchent des cotes mais ne les battent pas.
