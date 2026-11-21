@@ -1,0 +1,50 @@
+{
+ "genere_le": "2026-11-21T11:15:54+00:00",
+ "matchs": 249,
+ "championnats": [
+  "ARG",
+  "B1",
+  "BRA",
+  "D1",
+  "D2",
+  "E0",
+  "E1",
+  "E2",
+  "E3",
+  "EC",
+  "F1",
+  "F2",
+  "G1",
+  "I1",
+  "I2",
+  "MEX",
+  "N1",
+  "SC0",
+  "SC1",
+  "SC2",
+  "SC3",
+  "SP1",
+  "SP2",
+  "T1"
+ ],
+ "experts": {
+  "importes": 0,
+  "refuses": [],
+  "clotures": 0
+ },
+ "the_odds_api": {
+  "active": true,
+  "recupere_le": "2026-11-20T11:49:23+00:00",
+  "credits_restants": 462,
+  "matchs": 123,
+  "noms_non_reconnus": [
+   "ARG: Atlético Huracán",
+   "ARG: Belgrano de Cordoba",
+   "ARG: Instituto de Córdoba",
+   "D1: FSV Mainz 05",
+   "E0: Coventry City",
+   "E0: Hull City",
+   "SP1: Real Racing Club de Santander"
+  ]
+ }
+}
