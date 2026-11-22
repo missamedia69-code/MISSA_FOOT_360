@@ -48,10 +48,15 @@ fun BarreCombi(etat: EtatApp, ouvrir: () -> Unit) {
             Text((if (etat.unParMatch) "Ticket" else "Combiné libre") + " : ${etat.combi.size} sélection(s)", fontSize = 12.sp)
             if (r.proba == 0.0) Text("Sélections incompatibles (probabilité nulle)",
                 fontWeight = FontWeight.Bold, color = Rouge)
-            else Text("Réussite ${pct(r.proba, 1)}  ·  " +
-                (r.coteBookmaker?.let { c -> "cote ${cote(c)}" + (etat.mise?.let { m -> " · gain ${montant(m * c * (1 + etat.bonus))}" } ?: "") }
-                    ?: "cote juste ${cote(r.coteJuste)}"),
-                fontWeight = FontWeight.Bold, color = Vert)
+            else Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Réussite ", fontWeight = FontWeight.Bold, color = Vert)
+                PourcentageAnime(r.proba, dec = 1, taille = 16.sp, couleur = couleurProba(r.proba))
+                Text("  ·  " + (r.coteBookmaker?.let { c -> "cote ${cote(c)}" +
+                    (etat.mise?.let { m -> " · gain ${montant(m * c * (1 + etat.bonus))}" } ?: "") }
+                    ?: "cote juste ${cote(r.coteJuste)}"), fontWeight = FontWeight.Bold, color = Vert,
+                    maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            }
+            if (r.proba > 0) BarreProba(r.proba, Modifier.padding(top = 4.dp), couleurProba(r.proba), 3.dp)
         }
         Text("Voir ›", color = Or)
     }
@@ -72,10 +77,9 @@ fun EcranCombi(etat: EtatApp, vm: AppViewModel) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Chances de réussite", Modifier.weight(1f), fontWeight = FontWeight.Bold)
-                        Text(pct(r.proba, 1), fontSize = 26.sp, fontWeight = FontWeight.Bold,
-                            color = if (r.proba >= 0.5) Vert else if (r.proba >= 0.2) Or else Rouge)
+                        PourcentageAnime(r.proba, dec = 1, taille = 26.sp, couleur = couleurProba(r.proba))
                     }
-                    BarreProba(r.proba)
+                    BarreProba(r.proba, couleur = couleurProba(r.proba), hauteur = 6.dp)
                     Text("Sur 100 tickets identiques, environ ${"%.0f".format(r.proba * 100)} seraient gagnants.", fontSize = 12.sp)
                     Ligne("Cote totale du ticket", cote(r.coteBookmaker))
                     Ligne("Cote juste (équitable)", cote(r.coteJuste))

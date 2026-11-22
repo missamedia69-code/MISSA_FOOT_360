@@ -1,6 +1,16 @@
 package com.missa.foot360.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -56,29 +66,51 @@ fun Badge(texte: String, fond: Color, couleurTexte: Color = Color.Black) {
     )
 }
 
-/** Bouton de sélection 1 / N / 2 avec sa probabilité ; surligné s'il est dans le combiné. */
+/** Pourcentage animé : la valeur « défile » jusqu'à la nouvelle valeur quand elle change. */
+@Composable
+fun PourcentageAnime(
+    p: Double?, modifier: Modifier = Modifier, dec: Int = 0, taille: TextUnit = 14.sp,
+    couleur: Color = MaterialTheme.colorScheme.onSurface, gras: Boolean = true,
+) {
+    if (p == null) { Text("—", modifier, fontSize = taille, color = couleur); return }
+    val v by animateFloatAsState(p.toFloat(), tween(450, easing = FastOutSlowInEasing), label = "pct")
+    Text(pct(v.toDouble(), dec), modifier, fontSize = taille, color = couleur,
+        fontWeight = if (gras) FontWeight.Bold else FontWeight.Normal)
+}
+
+/** Couleur selon la probabilité : vert ≥ 50 %, or ≥ 20 %, rouge en dessous. */
+fun couleurProba(p: Double): Color = if (p >= 0.5) Vert else if (p >= 0.2) Or else Rouge
+
+/** Tuile de sélection compacte (libellé + probabilité) ; surlignée si elle est dans le ticket. */
 @Composable
 fun BoutonSelection(
     titre: String, proba: Double?, selectionne: Boolean, modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    val fond = if (selectionne) Vert else MaterialTheme.colorScheme.surfaceVariant
-    val texte = if (selectionne) Color.Black else MaterialTheme.colorScheme.onSurface
+    val fond by animateColorAsState(if (selectionne) Vert else MaterialTheme.colorScheme.surfaceVariant,
+        tween(250), label = "fond")
+    val texte by animateColorAsState(if (selectionne) Color.Black else MaterialTheme.colorScheme.onSurface,
+        tween(250), label = "texte")
+    val echelle by animateFloatAsState(if (selectionne) 1.04f else 1f, spring(dampingRatio = 0.5f), label = "echelle")
     Column(
-        modifier.clip(RoundedCornerShape(10.dp)).background(fond).clickable(onClick = onClick)
-            .padding(vertical = 6.dp),
+        modifier.graphicsLayer { scaleX = echelle; scaleY = echelle }
+            .clip(RoundedCornerShape(8.dp)).background(fond).clickable(onClick = onClick)
+            .padding(horizontal = 6.dp, vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(titre, color = texte, fontSize = 12.sp)
-        Text(pct(proba, 0), color = texte, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+        Text(titre, color = texte, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        PourcentageAnime(proba, taille = 13.sp, couleur = texte)
     }
 }
 
+/** Barre de probabilité animée. */
 @Composable
-fun BarreProba(p: Double, modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp))
+fun BarreProba(p: Double, modifier: Modifier = Modifier, couleur: Color = Vert, hauteur: Dp = 4.dp) {
+    val v by animateFloatAsState(p.toFloat().coerceIn(0f, 1f), tween(450, easing = FastOutSlowInEasing), label = "barre")
+    val c by animateColorAsState(couleur, tween(300), label = "couleur")
+    Box(modifier.fillMaxWidth().height(hauteur).clip(RoundedCornerShape(hauteur / 2))
         .background(MaterialTheme.colorScheme.surfaceVariant)) {
-        Box(Modifier.fillMaxWidth(p.toFloat().coerceIn(0f, 1f)).height(4.dp).background(Vert))
+        Box(Modifier.fillMaxWidth(v).height(hauteur).background(c))
     }
 }
 

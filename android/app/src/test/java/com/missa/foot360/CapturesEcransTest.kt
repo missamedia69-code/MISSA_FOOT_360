@@ -39,7 +39,7 @@ class CapturesEcransTest {
     val regle = createEmptyComposeRule()
 
     private fun attendreDonnees() = regle.waitUntil(20_000) {
-        regle.onAllNodesWithText("Score probable", substring = true).fetchSemanticsNodes().isNotEmpty()
+        regle.onAllNodesWithText("Pronostic :", substring = true).fetchSemanticsNodes().isNotEmpty()
     }
 
     @Test
@@ -54,7 +54,7 @@ class CapturesEcransTest {
         regle.onAllNodes(hasScrollToIndexAction())[0].performScrollToIndex(6)
         regle.waitForIdle()
         regle.waitForIdle()
-        regle.onAllNodesWithText("+2,5 buts", useUnmergedTree = true)[0].performClick()
+        regle.onAllNodesWithText("+2,5", useUnmergedTree = true)[0].performClick()
         regle.waitForIdle()
         regle.onAllNodes(hasScrollToIndexAction())[0].performScrollToIndex(0)
         regle.waitForIdle()
@@ -67,7 +67,7 @@ class CapturesEcransTest {
         regle.onNodeWithText("Matchs").performClick()
         regle.waitForIdle()
         regle.onAllNodesWithText(" - ", substring = true, useUnmergedTree = true).fetchSemanticsNodes().let { }
-        regle.onAllNodesWithText("Score probable", substring = true, useUnmergedTree = true)[0].performClick()
+        regle.onAllNodesWithText("Tous les paris", substring = true, useUnmergedTree = true)[0].performClick()
         regle.waitForIdle()
         regle.onRoot().captureRoboImage("../../docs/captures/2_detail_resultat.png")
         regle.onNodeWithText("Mi-temps").performScrollTo().performClick()

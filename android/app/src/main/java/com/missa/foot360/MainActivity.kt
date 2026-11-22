@@ -4,6 +4,11 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -108,7 +113,11 @@ fun Application(vm: AppViewModel) {
         },
         bottomBar = {
             Column {
-                if (route != "combi") BarreCombi(etat) { nav.navigate("combi") }
+                AnimatedVisibility(
+                    visible = route != "combi" && etat.resultat != null,
+                    enter = slideInVertically { it } + fadeIn(),
+                    exit = slideOutVertically { it } + fadeOut(),
+                ) { BarreCombi(etat) { nav.navigate("combi") } }
                 BandeauJeuResponsable("Probabilités, pas certitudes. 18+. Jouez avec modération.")
                 NavigationBar {
                     ONGLETS.forEach { (r, titre, icone) ->

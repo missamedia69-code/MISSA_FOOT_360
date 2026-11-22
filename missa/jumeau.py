@@ -294,6 +294,12 @@ def proba_combine(legs: list[tuple[str, str]], jumeaux: dict[str, JumeauMatch],
 
 
 # ----------------------------------------------------------------------------- catalogue affiché
+def fmt_h(h: float) -> str:
+    """Affichage d'un handicap : -1,5 / +2 / 0."""
+    t = f"{h:+g}".replace(".", ",")
+    return "0" if h == 0 else t
+
+
 def catalogue() -> list[tuple[str, str, list[tuple[str, str]]]]:
     """(groupe, titre du marché, [(code, libellé)]) — tous les marchés proposés à l'utilisateur."""
     def res(prefixe, suffixe=""):
@@ -312,9 +318,13 @@ def catalogue() -> list[tuple[str, str, list[tuple[str, str]]]]:
         ("Résultat", "Écart de victoire", [(f"MARGE:{m}", t) for m, t in
             (("dom1", "Dom. par 1"), ("dom2", "Dom. par 2"), ("dom3+", "Dom. par 3+"), ("nul", "Nul"),
              ("ext1", "Ext. par 1"), ("ext2", "Ext. par 2"), ("ext3+", "Ext. par 3+"))]),
-        ("Résultat", "Handicap 3 issues (-1 domicile)", res("HCP3:-1")),
-        ("Résultat", "Handicap 3 issues (+1 domicile)", res("HCP3:1")),
-        ("Résultat", "Handicap -1,5 domicile", [("HCP2:-1.5:1", "Domicile -1,5"), ("HCP2:-1.5:2", "Extérieur +1,5")]),
+        *[("Handicaps", f"Handicap européen {fmt_h(h)} (domicile)", res(f"HCP3:{h:g}"))
+          for h in (-3, -2, -1, 1, 2, 3)],
+        *[("Handicaps", f"Handicap {fmt_h(h)} / {fmt_h(-h)}",
+           [(f"HCP2:{h:g}:1", f"Domicile {fmt_h(h)}"), (f"HCP2:{h:g}:2", f"Extérieur {fmt_h(-h)}")])
+          for h in (-2.5, -1.5, -0.5, 0.5, 1.5, 2.5)],
+        ("Handicaps", "Handicap 1re mi-temps -0,5 / +0,5",
+         [("HCP2@MT1:-0.5:1", "Domicile -0,5"), ("HCP2@MT1:-0.5:2", "Extérieur +0,5")]),
         ("Buts", "Plus / moins (match)", ou("OU", [0.5, 1.5, 2.5, 3.5, 4.5, 5.5])),
         ("Buts", "Les deux équipes marquent", [("BTTS:oui", "Oui"), ("BTTS:non", "Non")]),
         ("Buts", "Nombre exact de buts", [(f"TG:{n}", t) for n, t in

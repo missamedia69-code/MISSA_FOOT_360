@@ -123,6 +123,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         return match.marches[ancien]?.meilleure_cote
     }
 
+    /** Libellé complet d'un code (« Titre du marché : option ») d'après le catalogue publié. */
+    fun libelleComplet(code: String): String {
+        for (g in _etat.value.pronostics.catalogue) for (o in g.options) if (o.code == code) return "${g.titre} : ${o.libelle}"
+        return code
+    }
+
     fun modifierMise(m: Double?) = _etat.update { it.copy(mise = m?.takeIf { v -> v > 0 }) }
 
     fun basculer(match: Match, code: String, libelle: String, cote: Double? = null) {

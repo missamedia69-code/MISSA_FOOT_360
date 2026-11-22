@@ -100,53 +100,68 @@ fun EcranMatchs(etat: EtatApp, vm: AppViewModel, ouvrir: (String) -> Unit) {
     }
 }
 
+/** Options rapides proposées sur chaque carte (code du jumeau, libellé court). */
+private val OPTIONS_RAPIDES = listOf(
+    "DC:1N" to "1N", "DC:12" to "12", "DC:N2" to "N2",
+    "OU:1.5:plus" to "+1,5", "OU:2.5:plus" to "+2,5", "OU:2.5:moins" to "−2,5", "OU:3.5:moins" to "−3,5",
+    "BTTS:oui" to "2 marquent", "BTTS:non" to "Pas les 2",
+    "HCP2:-1.5:1" to "Dom. −1,5", "HCP2:1.5:1" to "Dom. +1,5",
+    "HCP3:-1:1" to "H(−1) 1", "1X2@MT1:1" to "MT 1", "1X2@MT1:N" to "MT N",
+)
+
 @Composable
 fun CarteMatch(m: Match, vm: AppViewModel, etat: EtatApp, ouvrir: () -> Unit) {
+    val prono = m.pronostic_principal
+    val pProno = vm.proba(m.id, "1X2:$prono") ?: m.marches[prono]?.proba
+    val texteProno = when (prono) { "1" -> "Victoire ${m.domicile}"; "2" -> "Victoire ${m.exterieur}"; else -> "Match nul" }
     Card(
-        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 5.dp).clickable(onClick = ouvrir),
+        Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp).clickable(onClick = ouvrir),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
-        Column(Modifier.padding(12.dp)) {
+        Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(m.heure, fontSize = 12.sp, color = Or)
-                Spacer(Modifier.width(8.dp))
-                Text("${m.domicile} - ${m.exterieur}", fontWeight = FontWeight.SemiBold,
+                Text(m.heure, fontSize = 12.sp, color = Or, modifier = Modifier.width(42.dp))
+                Text("${m.domicile} – ${m.exterieur}", fontWeight = FontWeight.SemiBold, fontSize = 14.sp,
                     maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                if (m.selections_value.isNotEmpty()) Badge("VALUE", Vert)
             }
-            Spacer(Modifier.height(4.dp))
+            // Pronostic du moteur, en clair
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Pronostic : ", fontSize = 12.sp)
+                Text(texteProno, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Vert,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                Text(" · ", fontSize = 12.sp)
+                PourcentageAnime(pProno, taille = 12.sp, couleur = Vert)
+                Text("  ·  score ${m.score_probable}", fontSize = 11.sp)
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Score probable ${m.score_probable}", fontSize = 11.sp)
-                Text("· Prono : ${m.pronostic_principal}", fontSize = 11.sp)
-            }
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf("1", "N", "2").forEach { c ->
                     val code = "1X2:$c"
                     BoutonSelection(c, vm.proba(m.id, code) ?: m.marches[c]?.proba,
                         etat.combi.any { it.matchId == m.id && it.code == code },
-                        Modifier.weight(1f)) { vm.basculer(m, code, "1X2 : $c") }
+                        Modifier.weight(1f)) { vm.basculer(m, code, vm.libelleComplet(code)) }
                 }
             }
-            Spacer(Modifier.height(6.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(Triple("OU:2.5:plus", "+2,5 buts", "Plus / moins (match) : Plus de 2,5"),
-                       Triple("OU:2.5:moins", "−2,5 buts", "Plus / moins (match) : Moins de 2,5"),
-                       Triple("BTTS:oui", "Les 2 marquent", "Les deux équipes marquent : Oui")).forEach { (code, court, long) ->
+            // Autres paris, faites glisser
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(OPTIONS_RAPIDES, key = { it.first }) { (code, court) ->
                     BoutonSelection(court, vm.proba(m.id, code), etat.combi.any { it.matchId == m.id && it.code == code },
-                        Modifier.weight(1f)) { vm.basculer(m, code, long) }
+                        Modifier.width(76.dp)) { vm.basculer(m, code, vm.libelleComplet(code)) }
                 }
             }
-            val sure = m.selection_haute_confiance
-            if (sure != null || m.selections_value.isNotEmpty() || m.pronostiqueurs.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    if (sure != null) {
-                        val c = m.marches[sure]?.confiance
-                        Badge("★ ${c?.let { m.marches[sure]?.libelle } ?: sure} · historique ${pct(c?.taux_historique, 0)}", Or)
-                    }
-                    if (m.selections_value.isNotEmpty()) Badge("VALUE", Vert)
-                    if (m.pronostiqueurs.isNotEmpty()) Badge("${m.pronostiqueurs.size} expert(s)", couleurs.surfaceVariant, couleurs.onSurface)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val sure = m.selection_haute_confiance
+                if (sure != null) {
+                    val c = m.marches[sure]?.confiance
+                    Badge("★ ${m.marches[sure]?.libelle ?: sure} · réel ${pct(c?.taux_historique, 0)}", Or)
                 }
+                if (m.pronostiqueurs.isNotEmpty()) {
+                    Spacer(Modifier.width(6.dp))
+                    Badge("${m.pronostiqueurs.size} expert(s)", couleurs.surfaceVariant, couleurs.onSurface)
+                }
+                Spacer(Modifier.weight(1f))
+                Text("Tous les paris (${etat.pronostics.catalogue.sumOf { it.options.size }}) ›",
+                    fontSize = 11.sp, color = Or, modifier = Modifier.clickable(onClick = ouvrir))
             }
         }
     }

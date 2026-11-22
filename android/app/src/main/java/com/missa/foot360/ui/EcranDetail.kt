@@ -56,8 +56,7 @@ fun EcranDetail(m: Match?, etat: EtatApp, vm: AppViewModel) {
                 val be = j?.let { (0 until it.matrice.size).sumOf { k -> k * it.matrice.sumOf { r -> r[k] } } }
                 Text("Buts attendus : ${cote(bd)} - ${cote(be)}  ·  Corners : ${m.corners_attendus.joinToString(" - ") { cote(it) }}  ·  Cartons : ${m.cartons_attendus.joinToString(" - ") { cote(it) }}", fontSize = 13.sp)
                 Text(if (etat.unParMatch)
-                    "Touchez une option pour l'ajouter au ticket. Une seule sélection par match (règle des bookmakers) : " +
-                        "pour combiner plusieurs événements du même match, utilisez l'onglet « Combinés officiels »."
+                    "Touchez une option pour l'ajouter au ticket (une par match ; plusieurs événements : « Combinés officiels »)."
                 else "Mode analyse libre : plusieurs options d'un même match = probabilité conjointe exacte " +
                     "(non jouable tel quel chez un bookmaker).",
                     fontSize = 12.sp, color = if (etat.unParMatch) Vert else Or)
@@ -83,7 +82,7 @@ fun EcranDetail(m: Match?, etat: EtatApp, vm: AppViewModel) {
                         val sel = etat.combi.any { it.matchId == m.id && it.code == o.code }
                         val hist = p?.let { tauxHistorique(etat.pronostics.fiabilite, familleFiabilite(o.code), it) }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            BoutonSelection(o.libelle, p, sel, Modifier.width(104.dp)) {
+                            BoutonSelection(o.libelle, p, sel, Modifier.width(98.dp)) {
                                 vm.basculer(m, o.code, "${gm.titre} : ${o.libelle}")
                             }
                             Text("cote juste ${cote(p?.let { if (it > 0) 1 / it else null })}", fontSize = 10.sp)
