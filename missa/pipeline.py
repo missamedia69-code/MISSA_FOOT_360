@@ -93,6 +93,44 @@ def liste_value(champs: list) -> list[dict]:
     return sorted(out, key=lambda v: -v["valeur_brute"])
 
 
+def _resume_match(r, equipe: str) -> dict:
+    dom = r.domicile == equipe
+    bp, bc = (r.buts_dom, r.buts_ext) if dom else (r.buts_ext, r.buts_dom)
+    return {"date": r.date.strftime("%Y-%m-%d"), "adversaire": r.exterieur if dom else r.domicile,
+            "lieu": "dom" if dom else "ext", "score": f"{int(bp)}-{int(bc)}",
+            "res": "V" if bp > bc else "N" if bp == bc else "D"}
+
+
+def analyse_match(h: pd.DataFrame | None, dom: str, ext: str, sources: dict, p1x2) -> dict:
+    """Éléments d'explication : forme récente, confrontations, moyennes, avis de chaque source."""
+    out = {"sources": {k: [round(float(x), 4) for x in v] for k, v in sources.items()},
+           "final": [round(float(x), 4) for x in p1x2]}
+    if h is None or h.empty:
+        return out
+    h = h.sort_values("date")
+    for equipe, cle in ((dom, "dom"), (ext, "ext")):
+        mt = h[(h.domicile == equipe) | (h.exterieur == equipe)]
+        der = mt.tail(10)
+        if der.empty:
+            continue
+        bp = np.where(der.domicile == equipe, der.buts_dom, der.buts_ext)
+        bc = np.where(der.domicile == equipe, der.buts_ext, der.buts_dom)
+        lieu = mt[mt.domicile == equipe].tail(10) if cle == "dom" else mt[mt.exterieur == equipe].tail(10)
+        res_lieu = [_resume_match(r, equipe)["res"] for r in lieu.itertuples()]
+        out[f"forme_{cle}"] = [_resume_match(r, equipe) for r in mt.tail(5).itertuples()][::-1]
+        out[f"stats_{cle}"] = {
+            "matchs": int(len(der)), "buts_marques": round(float(bp.mean()), 2), "buts_encaisses": round(float(bc.mean()), 2),
+            "plus_2_5": round(float(np.mean(bp + bc >= 3)), 2), "btts": round(float(np.mean((bp > 0) & (bc > 0))), 2),
+            "clean_sheets": round(float(np.mean(bc == 0)), 2),
+            "lieu": {"v": res_lieu.count("V"), "n": res_lieu.count("N"), "d": res_lieu.count("D"),
+                     "type": "à domicile" if cle == "dom" else "à l'extérieur"},
+        }
+    h2h = h[((h.domicile == dom) & (h.exterieur == ext)) | ((h.domicile == ext) & (h.exterieur == dom))].tail(6)
+    out["confrontations"] = [{"date": r.date.strftime("%Y-%m-%d"), "domicile": r.domicile, "exterieur": r.exterieur,
+                              "score": f"{int(r.buts_dom)}-{int(r.buts_ext)}"} for r in h2h.itertuples()][::-1]
+    return out
+
+
 class Moteur:
     def __init__(self, stockage=None, cache: Path = donnees.CACHE):
         cfg = json.loads(MODELE.read_text()) if MODELE.exists() else {}
@@ -110,6 +148,7 @@ class Moteur:
             self.logit = LogitOrdonne()
             self.logit.b, self.logit.c1, self.logit.c2 = (cfg["elo_logit"][k] for k in ("b", "c1", "c2"))
         self._modeles: dict = {}
+        self._historiques: dict = {}
         self.params_jumeau = cfg.get("jumeau", {})
         f = RACINE / "data" / "fiabilite_marches.json"
         self.fiabilite = json.loads(f.read_text())["familles"] if f.exists() else {}
@@ -153,6 +192,7 @@ class Moteur:
             corners = comptages.ajuster(h, "corners", d) if h is not None else None
             cartons = comptages.ajuster(h, "cartons", d) if h is not None else None
             self._modeles[cle] = (dc, elo, corners, cartons)
+            self._historiques[cle] = h
         return self._modeles[cle]
 
     # --- un match -----------------------------------------------------------------------------
@@ -242,6 +282,8 @@ class Moteur:
             "jumeau": jumeau.vers_json(),
             "corners_attendus": [round(cm[0], 2), round(cm[1], 2)],
             "cartons_attendus": [round(ym[0], 2), round(ym[1], 2)],
+            "analyse": analyse_match(self._historiques.get((champ, d.normalize())), m["domicile"], m["exterieur"],
+                                     sources, p1x2),
         }
 
     # --- une journée ---------------------------------------------------------------------------

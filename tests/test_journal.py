@@ -33,3 +33,16 @@ def test_cloture_clv_et_gain():
     assert r["publies"] == 3 and r["regles"] == 2 and r["en_attente"] == 1
     assert r["rendement"] == pytest.approx(0.1)
     assert journal.cloturer(jr, res) == 0  # pas de double clôture
+
+
+def test_journal_pronostics():
+    champs = [{"nom": "PL", "matchs": [{"id": "m1", "domicile": "A", "exterieur": "B", "coup_envoi": "x",
+                                        "pronostic_principal": "1", "selection_haute_confiance": "1N",
+                                        "marches": {"1": {"libelle": "Victoire domicile", "proba": 0.6},
+                                                    "1N": {"libelle": "Double chance 1N", "proba": 0.88}}}]}]
+    jp = []
+    assert journal.ajouter_pronostics(jp, champs) == 2
+    assert journal.ajouter_pronostics(jp, champs) == 0
+    assert journal.cloturer_pronostics(jp, {"m1": {"buts_dom": 1, "buts_ext": 1}}) == 2
+    r = journal.resume_pronostics(jp)
+    assert r["principal"]["reussite"] == 0 and r["confiance"]["reussite"] == 1

@@ -173,6 +173,22 @@ def suivre_value(res: dict, sortie: Path) -> dict:
             print(f"[publier] résultats {champ} indisponibles : {e}")
     clotures = journal.cloturer(jr, resultats)
     (sortie / "journal_value.json").write_text(json.dumps(jr, ensure_ascii=False), encoding="utf-8")
+    # journal des pronostics publiés (réussite réelle du moteur)
+    jp = charger_precedent("journal_pronostics.json") or []
+    journal.ajouter_pronostics(jp, res["championnats"])
+    attente_p = {j["match_id"].split("-")[0] for j in jp if "gagne" not in j} - {m.split("-")[0] for m in resultats}
+    for champ in attente_p:
+        try:
+            h = (donnees.charger_extra(champ) if champ in donnees.EXTRA else
+                 pd.concat([donnees.charger_saison(champ, s_) for s_ in saisons_precedentes(pd.Timestamp.now(), 1)])
+                 if champ in donnees.CHAMPIONNATS else None)
+            if h is not None:
+                resultats |= journal.index_resultats(h, identifiant)
+        except Exception as e:
+            print(f"[publier] résultats {champ} indisponibles : {e}")
+    journal.cloturer_pronostics(jp, resultats)
+    (sortie / "journal_pronostics.json").write_text(json.dumps(jp, ensure_ascii=False), encoding="utf-8")
+    res["suivi_pronostics"] = journal.resume_pronostics(jp)
     return journal.resume(jr) | {"ajoutes": ajoutes, "clotures": clotures}
 
 
@@ -202,6 +218,9 @@ def main():
     calendrier = calendrier[calendrier["coup_envoi"].fillna(calendrier["date"]) >= limite]
     res = Moteur(stockage=stockage).predire(calendrier)
     res["suivi_value"] = suivre_value(res, sortie)
+    stats = RACINE / "data" / "stats_moteur.json"
+    if stats.exists():
+        res["stats_moteur"] = json.loads(stats.read_text(encoding="utf-8"))
     nb = sum(len(c["matchs"]) for c in res["championnats"])
 
     (sortie / "pronostics.json").write_text(json.dumps(res, ensure_ascii=False), encoding="utf-8")

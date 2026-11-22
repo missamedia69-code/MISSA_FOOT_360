@@ -1,0 +1,152 @@
+{
+ "periode": "saisons 2023/24 à 2026/27 (jamais vues par le moteur)",
+ "matchs": 5728,
+ "pronostics_evalues": 22912,
+ "reussis": 14282,
+ "reussite_globale": 0.6233,
+ "annonce_moyenne": 0.6168,
+ "par_type": [
+  {
+   "type": "Résultat final (1X2)",
+   "n": 5728,
+   "annonce": 0.5285,
+   "reussite": 0.5412
+  },
+  {
+   "type": "Double chance",
+   "n": 5728,
+   "annonce": 0.7875,
+   "reussite": 0.7963
+  },
+  {
+   "type": "Plus/moins 2,5 buts",
+   "n": 5728,
+   "annonce": 0.5851,
+   "reussite": 0.5948
+  },
+  {
+   "type": "Les deux équipes marquent",
+   "n": 5728,
+   "annonce": 0.5661,
+   "reussite": 0.5611
+  }
+ ],
+ "par_niveau": [
+  {
+   "niveau": "Très haute (≥ 85 %)",
+   "n": 1341,
+   "annonce": 0.8946,
+   "reussite": 0.9202
+  },
+  {
+   "niveau": "Haute (75–85 %)",
+   "n": 2640,
+   "annonce": 0.7939,
+   "reussite": 0.8083
+  },
+  {
+   "niveau": "Moyenne (60–75 %)",
+   "n": 6555,
+   "annonce": 0.6755,
+   "reussite": 0.6767
+  },
+  {
+   "niveau": "Faible (< 60 %)",
+   "n": 12376,
+   "annonce": 0.5179,
+   "reussite": 0.5234
+  }
+ ],
+ "par_championnat": [
+  {
+   "championnat": "Allemagne - Bundesliga",
+   "n": 991,
+   "reussite_1x2": 0.5409
+  },
+  {
+   "championnat": "Angleterre - Premier League",
+   "n": 1235,
+   "reussite_1x2": 0.5312
+  },
+  {
+   "championnat": "France - Ligue 1",
+   "n": 1004,
+   "reussite_1x2": 0.5349
+  },
+  {
+   "championnat": "Italie - Serie A",
+   "n": 1246,
+   "reussite_1x2": 0.5482
+  },
+  {
+   "championnat": "Espagne - Liga",
+   "n": 1252,
+   "reussite_1x2": 0.5495
+  }
+ ],
+ "combines": [
+  {
+   "de": 0,
+   "a": 0.05,
+   "n": 2824,
+   "annonce": 0.03426211818659923,
+   "reel": 0.03328611898016997
+  },
+  {
+   "de": 0.05,
+   "a": 0.1,
+   "n": 4314,
+   "annonce": 0.07390681925983109,
+   "reel": 0.07579972183588317
+  },
+  {
+   "de": 0.1,
+   "a": 0.2,
+   "n": 5449,
+   "annonce": 0.14491243771295637,
+   "reel": 0.15158744723802534
+  },
+  {
+   "de": 0.2,
+   "a": 0.3,
+   "n": 3266,
+   "annonce": 0.24562496533061393,
+   "reel": 0.24311083894672383
+  },
+  {
+   "de": 0.3,
+   "a": 0.4,
+   "n": 2058,
+   "annonce": 0.34558692634531696,
+   "reel": 0.35811467444120504
+  },
+  {
+   "de": 0.4,
+   "a": 0.5,
+   "n": 1086,
+   "annonce": 0.444608673220704,
+   "reel": 0.4281767955801105
+  },
+  {
+   "de": 0.5,
+   "a": 0.6,
+   "n": 559,
+   "annonce": 0.5444516181141192,
+   "reel": 0.5599284436493739
+  },
+  {
+   "de": 0.6,
+   "a": 0.7,
+   "n": 289,
+   "annonce": 0.6415519628192398,
+   "reel": 0.6608996539792388
+  },
+  {
+   "de": 0.7,
+   "a": 1,
+   "n": 155,
+   "annonce": 0.756034849215962,
+   "reel": 0.7290322580645161
+  }
+ ]
+}

@@ -90,3 +90,49 @@ def index_resultats(historique: pd.DataFrame, identifiant) -> dict:
             "clo_A": getattr(r, "clo_A", np.nan), "clo_plus25": getattr(r, "clo_plus25", np.nan),
             "clo_moins25": getattr(r, "clo_moins25", np.nan)}
     return out
+
+
+# ----------------------------------------------------------------------------- pronostics publiés
+def ajouter_pronostics(journal_p: list[dict], championnats: list[dict], maintenant: datetime | None = None) -> int:
+    """Enregistre, une seule fois par match, le pronostic principal (1X2) et la sélection
+    « haute confiance » publiés, pour mesurer la réussite réelle du moteur."""
+    maintenant = maintenant or datetime.now(timezone.utc)
+    deja = {(j["match_id"], j["type"]) for j in journal_p}
+    n = 0
+    for c in championnats:
+        for m in c["matchs"]:
+            for typ, code in (("principal", m.get("pronostic_principal")), ("confiance", m.get("selection_haute_confiance"))):
+                if not code or (m["id"], typ) in deja or code not in m["marches"]:
+                    continue
+                journal_p.append({"match_id": m["id"], "championnat": c["nom"], "type": typ, "selection": code,
+                                  "libelle": m["marches"][code]["libelle"], "proba": m["marches"][code]["proba"],
+                                  "domicile": m["domicile"], "exterieur": m["exterieur"], "coup_envoi": m["coup_envoi"],
+                                  "publie_le": maintenant.isoformat(timespec="seconds")})
+                n += 1
+    return n
+
+
+def cloturer_pronostics(journal_p: list[dict], resultats: dict) -> int:
+    from .selections import SELECTIONS
+    n = 0
+    for j in journal_p:
+        if "gagne" in j or j["match_id"] not in resultats or j["selection"] not in SELECTIONS:
+            continue
+        r = resultats[j["match_id"]]
+        j["score"] = f"{int(r['buts_dom'])}-{int(r['buts_ext'])}"
+        j["gagne"] = bool(SELECTIONS[j["selection"]][1](int(r["buts_dom"]), int(r["buts_ext"])))
+        n += 1
+    return n
+
+
+def resume_pronostics(journal_p: list[dict]) -> dict:
+    out = {}
+    for typ in ("principal", "confiance"):
+        regles = [j for j in journal_p if j["type"] == typ and "gagne" in j]
+        out[typ] = {"publies": sum(j["type"] == typ for j in journal_p), "regles": len(regles)}
+        if regles:
+            out[typ] |= {"reussite": round(float(np.mean([j["gagne"] for j in regles])), 4),
+                         "annonce": round(float(np.mean([j["proba"] for j in regles])), 4)}
+    out["derniers"] = [{k: j[k] for k in ("domicile", "exterieur", "libelle", "proba", "score", "gagne", "type")}
+                       for j in sorted([j for j in journal_p if "gagne" in j], key=lambda j: j["coup_envoi"])[-15:]][::-1]
+    return out
