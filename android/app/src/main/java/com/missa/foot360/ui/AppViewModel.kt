@@ -32,6 +32,7 @@ data class EtatApp(
     val modulations: Map<String, Modulation> = emptyMap(),
     val bonus: Double = 0.0,
     val unParMatch: Boolean = true,
+    val mise: Double? = null,
     val message: String? = null,
 ) {
     val matchs: Map<String, Match> by lazy {
@@ -111,10 +112,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _etat.value.combi.any { it.matchId == matchId && it.code == code }
 
     /** Ajoute ou retire une sélection en respectant les règles du ticket ; recalcul immédiat. */
+    /** Meilleure cote du marché connue pour ce code (1X2 et plus/moins 2,5), sinon null. */
+    private fun coteMarche(match: Match, code: String): Double? {
+        val ancien = when {
+            code.startsWith("1X2:") && "@" !in code -> code.removePrefix("1X2:")
+            code == "OU:2.5:plus" -> "plus_2.5"
+            code == "OU:2.5:moins" -> "moins_2.5"
+            else -> return null
+        }
+        return match.marches[ancien]?.meilleure_cote
+    }
+
+    fun modifierMise(m: Double?) = _etat.update { it.copy(mise = m?.takeIf { v -> v > 0 }) }
+
     fun basculer(match: Match, code: String, libelle: String, cote: Double? = null) {
         _etat.update { e ->
             val r = RegleTicket.basculer(e.combi,
-                JambeCombine(match.id, code, "${match.domicile} - ${match.exterieur}", libelle, cote), e.unParMatch)
+                JambeCombine(match.id, code, "${match.domicile} - ${match.exterieur}", libelle,
+                    cote ?: coteMarche(match, code)), e.unParMatch)
             e.copy(combi = r.ticket, message = r.message)
         }
         recalculer()

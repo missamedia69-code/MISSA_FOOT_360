@@ -48,7 +48,9 @@ fun BarreCombi(etat: EtatApp, ouvrir: () -> Unit) {
             Text((if (etat.unParMatch) "Ticket" else "Combiné libre") + " : ${etat.combi.size} sélection(s)", fontSize = 12.sp)
             if (r.proba == 0.0) Text("Sélections incompatibles (probabilité nulle)",
                 fontWeight = FontWeight.Bold, color = Rouge)
-            else Text("Probabilité ${pct(r.proba, 2)}  ·  cote juste ${cote(r.coteJuste)}",
+            else Text("Réussite ${pct(r.proba, 1)}  ·  " +
+                (r.coteBookmaker?.let { c -> "cote ${cote(c)}" + (etat.mise?.let { m -> " · gain ${montant(m * c * (1 + etat.bonus))}" } ?: "") }
+                    ?: "cote juste ${cote(r.coteJuste)}"),
                 fontWeight = FontWeight.Bold, color = Vert)
         }
         Text("Voir ›", color = Or)
@@ -61,12 +63,54 @@ fun EcranCombi(etat: EtatApp, vm: AppViewModel) {
     LazyColumn(contentPadding = PaddingValues(16.dp)) {
         item {
             Text(if (etat.unParMatch) "Mon ticket" else "Mon combiné (analyse libre)", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(4.dp))
-            Text("La probabilité est recalculée à chaque modification. Saisissez la cote de votre " +
-                "bookmaker pour voir la valeur du combiné.", fontSize = 12.sp)
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(8.dp))
         }
         if (etat.combi.isEmpty()) item { Text("Aucune sélection. Touchez un pronostic pour l'ajouter.") }
+        // --- Résumé en haut : visible immédiatement, mis à jour en temps réel ---
+        if (r != null) item {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Chances de réussite", Modifier.weight(1f), fontWeight = FontWeight.Bold)
+                        Text(pct(r.proba, 1), fontSize = 26.sp, fontWeight = FontWeight.Bold,
+                            color = if (r.proba >= 0.5) Vert else if (r.proba >= 0.2) Or else Rouge)
+                    }
+                    BarreProba(r.proba)
+                    Text("Sur 100 tickets identiques, environ ${"%.0f".format(r.proba * 100)} seraient gagnants.", fontSize = 12.sp)
+                    Ligne("Cote totale du ticket", cote(r.coteBookmaker))
+                    Ligne("Cote juste (équitable)", cote(r.coteJuste))
+                    val manquantes = etat.combi.count { it.cote == null }
+                    if (manquantes > 0) Text("$manquantes cote(s) à saisir pour calculer la cote totale et les gains.",
+                        fontSize = 12.sp, color = Or)
+                    var mise by remember { mutableStateOf(etat.mise?.let { "%.0f".format(it) } ?: "") }
+                    OutlinedTextField(
+                        value = mise, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Mise") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        onValueChange = { mise = it; vm.modifierMise(it.replace(',', '.').toDoubleOrNull()) },
+                    )
+                    val m = etat.mise
+                    if (m != null && r.coteBookmaker != null) {
+                        val gain = m * r.coteBookmaker * (1 + etat.bonus)
+                        Ligne("Gain potentiel (si gagné)", montant(gain), Vert)
+                        Ligne("Gain moyen attendu", (if (gain * r.proba - m >= 0) "+" else "") + montant(gain * r.proba - m),
+                            if (gain * r.proba - m >= 0) Vert else Rouge)
+                    }
+                    r.valeurAttendue?.let { Ligne("Valeur du ticket", signe(it), if (it > 0) Vert else Rouge) }
+                    if (r.proba < 0.05 && r.proba > 0) Text("Ticket très improbable (moins de 1 chance sur 20).",
+                        fontSize = 12.sp, color = Rouge)
+                    if (r.proba == 0.0) Text("Sélections incompatibles entre elles.", fontSize = 12.sp, color = Rouge)
+                    if (r.valeurAttendue != null && r.valeurAttendue < 0) Text("Valeur négative : à long terme, " +
+                        "ce type de ticket fait perdre de l'argent.", fontSize = 12.sp, color = Rouge)
+                    if (r.memeMatch) Text("Analyse libre : plusieurs sélections sur un même match (corrélation prise " +
+                        "en compte). Ce ticket ne serait PAS accepté tel quel par un bookmaker.", fontSize = 12.sp, color = Rouge)
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text("Sélections (${etat.combi.size} / ${com.missa.foot360.moteur.RegleTicket.MAX_SELECTIONS}) — cotes préremplies " +
+                "avec la meilleure cote du marché quand elle est connue : remplacez-les par celles de votre bookmaker.",
+                fontSize = 12.sp)
+        }
         itemsIndexed(etat.combi) { i, s ->
             Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                 Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -74,7 +118,8 @@ fun EcranCombi(etat: EtatApp, vm: AppViewModel) {
                         Text(s.libelleMatch, fontSize = 12.sp)
                         Text(s.libelle, fontWeight = FontWeight.Bold)
                         val p = vm.proba(s.matchId, s.code)
-                        Text("Probabilité seule : ${pct(p)}", fontSize = 12.sp, color = Vert)
+                        Text("Probabilité seule : ${pct(p)} · cote juste ${cote(p?.let { if (it > 0) 1 / it else null })}",
+                            fontSize = 12.sp, color = Vert)
                     }
                     var texte by remember(s.matchId, s.code) { mutableStateOf(s.cote?.let { cote(it) } ?: "") }
                     OutlinedTextField(
@@ -91,49 +136,31 @@ fun EcranCombi(etat: EtatApp, vm: AppViewModel) {
             }
         }
         if (r != null) item {
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(8.dp))
             var bonus by remember { mutableStateOf(if (etat.bonus > 0) "%.0f".format(etat.bonus * 100) else "") }
             OutlinedTextField(
                 value = bonus, singleLine = true, modifier = Modifier.fillMaxWidth(),
-                label = { Text("Bonus de gains du bookmaker sur ce combiné (%)") },
+                label = { Text("Bonus de gains du bookmaker sur ce ticket (%)") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 onValueChange = {
                     bonus = it
                     vm.modifierBonus((it.replace(',', '.').toDoubleOrNull() ?: 0.0) / 100)
                 },
             )
-            Spacer(Modifier.height(12.dp))
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Ligne("Probabilité du combiné", pct(r.proba, 2), Vert)
-                    Ligne("Cote juste (équitable)", cote(r.coteJuste))
-                    Ligne("Cote du bookmaker", cote(r.coteBookmaker))
-                    if (etat.bonus > 0) Ligne("Bonus inclus", "+${"%.0f".format(etat.bonus * 100)} %")
-                    if (r.probaParMatch.size > 1) r.probaParMatch.forEach { (id, p) ->
-                        val mm = etat.matchs[id]
-                        Ligne("  ${mm?.domicile ?: id} - ${mm?.exterieur ?: ""}", pct(p))
-                    }
-                    r.valeurAttendue?.let {
-                        Ligne("Valeur attendue", signe(it), if (it > 0) Vert else Rouge)
-                    }
-                    Text("Sur 100 combinés identiques, environ ${"%.0f".format(r.proba * 100)} seraient gagnants.",
-                        fontSize = 12.sp)
-                    if (r.memeMatch) Text("Analyse libre : plusieurs sélections sur un même match (corrélation prise " +
-                        "en compte). Ce ticket ne serait PAS accepté tel quel par un bookmaker.", fontSize = 12.sp, color = Rouge)
-                    val hors = com.missa.foot360.moteur.RegleTicket.horsBonus(etat.combi) { j ->
-                        vm.proba(j.matchId, j.code)?.let { if (it > 0) 1 / it else null } }
-                    if (hors.isNotEmpty()) Text("${hors.size} sélection(s) à moins de 1,10 : en général non prise(s) en " +
-                        "compte pour le bonus de gains.", fontSize = 12.sp, color = Or)
-                    Text("${etat.combi.size} / ${com.missa.foot360.moteur.RegleTicket.MAX_SELECTIONS} sélections.", fontSize = 11.sp)
-                    if (r.proba < 0.05 && r.proba > 0) Text("Combiné très improbable (moins de 1 chance sur 20).",
-                        fontSize = 12.sp, color = Rouge)
-                    if (r.proba == 0.0) Text("Sélections incompatibles entre elles.", fontSize = 12.sp, color = Rouge)
-                    if (r.valeurAttendue != null && r.valeurAttendue < 0) Text("Valeur négative : à long terme, " +
-                        "ce type de combiné fait perdre de l'argent.", fontSize = 12.sp, color = Rouge)
+            val hors = com.missa.foot360.moteur.RegleTicket.horsBonus(etat.combi) { j ->
+                vm.proba(j.matchId, j.code)?.let { if (it > 0) 1 / it else null } }
+            if (hors.isNotEmpty()) Text("${hors.size} sélection(s) à moins de 1,10 : en général non prise(s) en " +
+                "compte pour le bonus de gains.", fontSize = 12.sp, color = Or)
+            if (r.probaParMatch.size > 1) {
+                Spacer(Modifier.height(8.dp))
+                Text("Détail par match", fontWeight = FontWeight.Bold)
+                r.probaParMatch.forEach { (id, p) ->
+                    val mm = etat.matchs[id]
+                    Ligne("${mm?.domicile ?: id} - ${mm?.exterieur ?: ""}", pct(p))
                 }
             }
             Spacer(Modifier.height(12.dp))
-            Button(onClick = { vm.vider() }, modifier = Modifier.fillMaxWidth()) { Text("Vider le combiné") }
+            Button(onClick = { vm.vider() }, modifier = Modifier.fillMaxWidth()) { Text("Vider le ticket") }
         }
     }
 }

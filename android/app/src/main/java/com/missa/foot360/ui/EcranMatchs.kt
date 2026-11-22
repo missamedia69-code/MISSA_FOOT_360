@@ -127,6 +127,15 @@ fun CarteMatch(m: Match, vm: AppViewModel, etat: EtatApp, ouvrir: () -> Unit) {
                         Modifier.weight(1f)) { vm.basculer(m, code, "1X2 : $c") }
                 }
             }
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(Triple("OU:2.5:plus", "+2,5 buts", "Plus / moins (match) : Plus de 2,5"),
+                       Triple("OU:2.5:moins", "−2,5 buts", "Plus / moins (match) : Moins de 2,5"),
+                       Triple("BTTS:oui", "Les 2 marquent", "Les deux équipes marquent : Oui")).forEach { (code, court, long) ->
+                    BoutonSelection(court, vm.proba(m.id, code), etat.combi.any { it.matchId == m.id && it.code == code },
+                        Modifier.weight(1f)) { vm.basculer(m, code, long) }
+                }
+            }
             val sure = m.selection_haute_confiance
             if (sure != null || m.selections_value.isNotEmpty() || m.pronostiqueurs.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))

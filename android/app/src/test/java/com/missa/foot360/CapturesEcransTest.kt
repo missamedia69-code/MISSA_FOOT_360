@@ -7,6 +7,11 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.test.onRoot
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -43,8 +48,23 @@ class CapturesEcransTest {
         ActivityScenario.launch(MainActivity::class.java)
         attendreDonnees()
         regle.onRoot().captureRoboImage("../../docs/captures/1_matchs.png")
+        // Scénario : « 1 » sur le 1er match, « 2 » sur le 2e, « +2,5 buts » sur le 3e
         regle.onAllNodesWithText("1", useUnmergedTree = true)[0].performClick()
-        regle.onAllNodesWithText("N", useUnmergedTree = true)[1].performClick()
+        regle.onAllNodesWithText("2", useUnmergedTree = true)[1].performClick()
+        regle.onAllNodes(hasScrollToIndexAction())[0].performScrollToIndex(6)
+        regle.waitForIdle()
+        regle.waitForIdle()
+        regle.onAllNodesWithText("+2,5 buts", useUnmergedTree = true)[0].performClick()
+        regle.waitForIdle()
+        regle.onAllNodes(hasScrollToIndexAction())[0].performScrollToIndex(0)
+        regle.waitForIdle()
+        regle.onRoot().captureRoboImage("../../docs/captures/10_scenario_liste.png")
+        regle.onNodeWithText("Voir ›").performClick()
+        regle.waitForIdle()
+        regle.onNodeWithText("Mise").performScrollTo().performTextInput("1000")
+        regle.waitForIdle()
+        regle.onRoot().captureRoboImage("../../docs/captures/11_scenario_ticket.png")
+        regle.onNodeWithText("Matchs").performClick()
         regle.waitForIdle()
         regle.onAllNodesWithText(" - ", substring = true, useUnmergedTree = true).fetchSemanticsNodes().let { }
         regle.onAllNodesWithText("Score probable", substring = true, useUnmergedTree = true)[0].performClick()

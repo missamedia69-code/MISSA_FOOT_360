@@ -43,6 +43,8 @@ fun pct(p: Double?, dec: Int = 1): String =
 
 fun cote(c: Double?): String = if (c == null) "—" else String.format(Locale.FRANCE, "%.2f", c)
 
+fun montant(v: Double): String = String.format(Locale.FRANCE, "%,.0f", v)
+
 fun signe(v: Double?): String = if (v == null) "—" else String.format(Locale.FRANCE, "%+.1f %%", v * 100)
 
 @Composable
