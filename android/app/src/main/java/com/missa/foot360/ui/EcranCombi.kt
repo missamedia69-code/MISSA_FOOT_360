@@ -63,14 +63,19 @@ fun BarreCombi(etat: EtatApp, ouvrir: () -> Unit) {
 }
 
 @Composable
-fun EcranCombi(etat: EtatApp, vm: AppViewModel) {
+fun EcranCombi(etat: EtatApp, vm: AppViewModel, aller: (String) -> Unit = {}) {
     val r = etat.resultat
     LazyColumn(contentPadding = PaddingValues(16.dp)) {
         item {
             Text(if (etat.unParMatch) "Mon ticket" else "Mon combiné (analyse libre)", fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
         }
-        if (etat.combi.isEmpty()) item { Text("Aucune sélection. Touchez un pronostic pour l'ajouter.") }
+        if (etat.combi.isEmpty()) item {
+            Text("Votre ticket est vide. Touchez une sélection dans « Accueil » ou « Analyses », ou laissez le moteur " +
+                "en proposer un.", fontSize = 13.sp)
+            Spacer(Modifier.height(10.dp))
+            Button(onClick = { aller("assistant") }, modifier = Modifier.fillMaxWidth()) { Text("Générer un ticket automatiquement") }
+        }
         // --- Résumé en haut : visible immédiatement, mis à jour en temps réel ---
         if (r != null) item {
             Card(Modifier.fillMaxWidth()) {
@@ -80,6 +85,12 @@ fun EcranCombi(etat: EtatApp, vm: AppViewModel) {
                         PourcentageAnime(r.proba, dec = 1, taille = 26.sp, couleur = couleurProba(r.proba))
                     }
                     BarreProba(r.proba, couleur = couleurProba(r.proba), hauteur = 6.dp)
+                    val (niv, coul) = risque(r.proba)
+                    Row {
+                        Text("Risque estimé : ", fontSize = 13.sp)
+                        Text(niv, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = coul)
+                        Text("  ·  ${etat.combi.size} sélection(s)", fontSize = 13.sp)
+                    }
                     Text("Sur 100 tickets identiques, environ ${"%.0f".format(r.proba * 100)} seraient gagnants.", fontSize = 12.sp)
                     Ligne("Cote totale du ticket", cote(r.coteBookmaker))
                     Ligne("Cote juste (équitable)", cote(r.coteJuste))
@@ -163,8 +174,24 @@ fun EcranCombi(etat: EtatApp, vm: AppViewModel) {
                     Ligne("${mm?.domicile ?: id} - ${mm?.exterieur ?: ""}", pct(p))
                 }
             }
-            Spacer(Modifier.height(12.dp))
-            Button(onClick = { vm.vider() }, modifier = Modifier.fillMaxWidth()) { Text("Vider le ticket") }
+            Spacer(Modifier.height(10.dp))
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(12.dp)) {
+                    Text("Conseil du moteur", fontWeight = FontWeight.Bold, color = Vert)
+                    val faible = etat.combi.mapNotNull { j -> vm.proba(j.matchId, j.code)?.let { j to it } }.minByOrNull { it.second }
+                    Text(buildString {
+                        if (faible != null && etat.combi.size > 1)
+                            append("Sélection la plus fragile : ${faible.first.libelleMatch} (${pct(faible.second, 0)}). Retirez-la pour faire passer le ticket à ${pct(r.proba / faible.second, 0)}. ")
+                        append("Chaque sélection ajoutée multiplie le risque. Vérifiez les dernières informations (compositions, absences) avant de jouer.")
+                    }, fontSize = 12.sp)
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            Button(onClick = { vm.enregistrerTicket() }, modifier = Modifier.fillMaxWidth()) { Text("Enregistrer le ticket") }
+            Spacer(Modifier.height(6.dp))
+            Button(onClick = { vm.vider() }, modifier = Modifier.fillMaxWidth(),
+                colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = couleurs.surfaceVariant,
+                    contentColor = couleurs.onSurface)) { Text("Vider le ticket") }
         }
     }
 }

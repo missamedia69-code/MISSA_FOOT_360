@@ -15,7 +15,68 @@ data class Pronostics(
     val fiabilite: Map<String, List<TrancheFiabilite>> = emptyMap(),
     val value: List<ValueBet> = emptyList(),
     val suivi_value: SuiviValue? = null,
+    val stats_moteur: StatsMoteur? = null,
+    val suivi_pronostics: SuiviPronostics? = null,
+    val resultats: Map<String, List<Int>> = emptyMap(),
 )
+
+@Serializable
+data class LigneStat(val type: String = "", val niveau: String = "", val championnat: String = "", val n: Int = 0,
+                     val annonce: Double? = null, val reussite: Double? = null, val reussite_1x2: Double? = null)
+
+/** Performances mesurées sur des saisons jamais vues par le moteur. */
+@Serializable
+data class StatsMoteur(
+    val periode: String = "", val matchs: Int = 0, val pronostics_evalues: Int = 0, val reussis: Int = 0,
+    val reussite_globale: Double = 0.0, val annonce_moyenne: Double = 0.0,
+    val par_type: List<LigneStat> = emptyList(), val par_niveau: List<LigneStat> = emptyList(),
+    val par_championnat: List<LigneStat> = emptyList(), val combines: List<TrancheFiabilite> = emptyList(),
+)
+
+@Serializable
+data class BilanType(val publies: Int = 0, val regles: Int = 0, val reussite: Double? = null, val annonce: Double? = null)
+
+@Serializable
+data class PronoRegle(val domicile: String, val exterieur: String, val libelle: String, val proba: Double,
+                      val score: String = "", val gagne: Boolean = false, val type: String = "")
+
+/** Pronostics réellement publiés et leur résultat. */
+@Serializable
+data class SuiviPronostics(val principal: BilanType = BilanType(), val confiance: BilanType = BilanType(),
+                           val derniers: List<PronoRegle> = emptyList())
+
+@Serializable
+data class MatchForme(val date: String = "", val adversaire: String = "", val lieu: String = "", val score: String = "",
+                      val res: String = "")
+
+@Serializable
+data class BilanLieu(val v: Int = 0, val n: Int = 0, val d: Int = 0, val type: String = "")
+
+@Serializable
+data class StatsEquipe(val matchs: Int = 0, val buts_marques: Double = 0.0, val buts_encaisses: Double = 0.0,
+                       val plus_2_5: Double = 0.0, val btts: Double = 0.0, val clean_sheets: Double = 0.0,
+                       val lieu: BilanLieu = BilanLieu())
+
+@Serializable
+data class Confrontation(val date: String = "", val domicile: String = "", val exterieur: String = "", val score: String = "")
+
+/** Éléments d'explication d'un pronostic. */
+@Serializable
+data class Analyse(
+    val sources: Map<String, List<Double>> = emptyMap(), val final: List<Double> = emptyList(),
+    val forme_dom: List<MatchForme> = emptyList(), val forme_ext: List<MatchForme> = emptyList(),
+    val stats_dom: StatsEquipe? = null, val stats_ext: StatsEquipe? = null,
+    val confrontations: List<Confrontation> = emptyList(),
+)
+
+/** Ticket enregistré dans l'historique (stocké sur le téléphone). */
+@Serializable
+data class JambeSauvee(val matchId: String, val code: String, val libelleMatch: String, val libelle: String,
+                       val cote: Double? = null, val proba: Double? = null)
+
+@Serializable
+data class TicketSauve(val id: Long, val date: String, val jambes: List<JambeSauvee>, val proba: Double,
+                       val cote: Double? = null, val mise: Double? = null)
 
 /** Pari « value » : la meilleure cote du marché dépasse le prix juste du consensus. */
 @Serializable
@@ -119,6 +180,7 @@ data class Match(
     val jumeau: JumeauJson? = null,
     val corners_attendus: List<Double> = emptyList(),
     val cartons_attendus: List<Double> = emptyList(),
+    val analyse: Analyse = Analyse(),
 ) {
     /** Coup d'envoi dans le fuseau horaire du téléphone (les heures publiées sont en UTC, « …Z »). */
     private val local: java.time.LocalDateTime?

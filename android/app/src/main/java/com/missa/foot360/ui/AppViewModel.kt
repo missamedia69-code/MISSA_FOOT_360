@@ -34,10 +34,41 @@ data class EtatApp(
     val unParMatch: Boolean = true,
     val mise: Double? = null,
     val actualisation: Boolean = false,
+    val tickets: List<com.missa.foot360.data.TicketSauve> = emptyList(),
     val message: String? = null,
 ) {
     val matchs: Map<String, Match> by lazy {
         pronostics.championnats.flatMap { it.matchs }.associateBy { it.id }
+    }
+}
+
+/** Niveau de risque d'une probabilité (sélection ou ticket). */
+fun risque(p: Double): Pair<String, androidx.compose.ui.graphics.Color> = when {
+    p >= 0.75 -> "Faible" to Vert
+    p >= 0.55 -> "Modéré" to Or
+    p >= 0.35 -> "Élevé" to androidx.compose.ui.graphics.Color(0xFFFF8A3D)
+    else -> "Très élevé" to Rouge
+}
+
+/** Statut d'un ticket enregistré d'après les scores finaux publiés. */
+enum class Statut(val libelle: String) { GAGNE("Gagné"), PERDU("Perdu"), ATTENTE("En attente"), INVERIFIABLE("Non vérifiable") }
+
+fun statutSelection(code: String, score: List<Int>?): Statut {
+    if (score == null || score.size < 2) return Statut.ATTENTE
+    val mtDependant = listOf("@MT", "MTFT", "MT_PLUS", "_2MT", "_1MT", "CORNERS_", "CARTONS_").any { it in code }
+    if (mtDependant) return Statut.INVERIFIABLE
+    val (i, j) = score[0] to score[1]
+    val ok = code.split("&").all { d -> d.split("|").any { t -> Jumeau.termeButs(t.trim(), 0, 0, i, j) } }
+    return if (ok) Statut.GAGNE else Statut.PERDU
+}
+
+fun statutTicket(t: com.missa.foot360.data.TicketSauve, resultats: Map<String, List<Int>>): Statut {
+    val s = t.jambes.map { statutSelection(it.code, resultats[it.matchId]) }
+    return when {
+        Statut.PERDU in s -> Statut.PERDU
+        Statut.ATTENTE in s -> Statut.ATTENTE
+        Statut.INVERIFIABLE in s -> Statut.INVERIFIABLE
+        else -> Statut.GAGNE
     }
 }
 
@@ -66,7 +97,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val cacheJumeaux = HashMap<Pair<String, Modulation>, Jumeau>()
 
     init {
-        _etat.update { it.copy(unParMatch = !depot.plusieursParMatch) }
+        _etat.update { it.copy(unParMatch = !depot.plusieursParMatch, tickets = depot.tickets) }
         charger()
     }
 
@@ -157,6 +188,27 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun libelleComplet(code: String): String {
         for (g in _etat.value.pronostics.catalogue) for (o in g.options) if (o.code == code) return "${g.titre} : ${o.libelle}"
         return code
+    }
+
+    /** Enregistre le ticket en cours dans l'historique du téléphone. */
+    fun enregistrerTicket() {
+        val e = _etat.value
+        val r = e.resultat ?: return
+        val t = com.missa.foot360.data.TicketSauve(
+            id = System.currentTimeMillis(),
+            date = java.time.LocalDateTime.now().withNano(0).toString(),
+            jambes = e.combi.map { j -> com.missa.foot360.data.JambeSauvee(j.matchId, j.code, j.libelleMatch, j.libelle, j.cote, proba(j.matchId, j.code)) },
+            proba = r.proba, cote = r.coteBookmaker, mise = e.mise,
+        )
+        val liste = listOf(t) + e.tickets
+        depot.tickets = liste
+        _etat.update { it.copy(tickets = liste, message = "Ticket enregistré dans « Profil » : il sera vérifié automatiquement après les matchs.") }
+    }
+
+    fun supprimerTicket(id: Long) {
+        val liste = _etat.value.tickets.filterNot { it.id == id }
+        depot.tickets = liste
+        _etat.update { it.copy(tickets = liste) }
     }
 
     fun modifierMise(m: Double?) = _etat.update { it.copy(mise = m?.takeIf { v -> v > 0 }) }

@@ -189,6 +189,8 @@ def suivre_value(res: dict, sortie: Path) -> dict:
     journal.cloturer_pronostics(jp, resultats)
     (sortie / "journal_pronostics.json").write_text(json.dumps(jp, ensure_ascii=False), encoding="utf-8")
     res["suivi_pronostics"] = journal.resume_pronostics(jp)
+    # scores finaux récents : l'application vérifie elle-même les tickets enregistrés
+    res["resultats"] = {j["match_id"]: [int(x) for x in j["score"].split("-")] for j in jp[-600:] if "score" in j}
     return journal.resume(jr) | {"ajoutes": ajoutes, "clotures": clotures}
 
 

@@ -31,6 +31,12 @@ class Depot(private val context: Context) {
         get() = prefs.getBoolean("majeur", false)
         set(v) = prefs.edit().putBoolean("majeur", v).apply()
 
+    /** Historique des tickets, stocké sur le téléphone. */
+    var tickets: List<TicketSauve>
+        get() = runCatching { json.decodeFromString<List<TicketSauve>>(prefs.getString("tickets", "[]") ?: "[]") }
+            .getOrDefault(emptyList())
+        set(v) = prefs.edit().putString("tickets", json.encodeToString(kotlinx.serialization.builtins.ListSerializer(TicketSauve.serializer()), v.take(100))).apply()
+
     data class Chargement(val pronostics: Pronostics, val horsLigne: Boolean, val erreur: String?)
 
     /** Mode « fichier » : l'adresse pointe vers un pronostics.json publié (GitHub Actions). */

@@ -25,6 +25,15 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SportsSoccer
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material3.BadgedBox
+import androidx.compose.ui.unit.sp
+import com.missa.foot360.ui.EcranAccueil
+import com.missa.foot360.ui.EcranStats
+import com.missa.foot360.ui.EcranProfil
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -75,11 +84,11 @@ class MainActivity : ComponentActivity() {
 }
 
 private val ONGLETS = listOf(
-    Triple("matchs", "Matchs", Icons.Default.SportsSoccer),
-    Triple("assistant", "Assistant", Icons.Default.AutoAwesome),
-    Triple("confiance", "Conseils", Icons.Default.Star),
-    Triple("experts", "Experts", Icons.Default.Groups),
-    Triple("reglages", "Réglages", Icons.Default.Settings),
+    Triple("accueil", "Accueil", Icons.Default.Home),
+    Triple("matchs", "Analyses", Icons.Default.SportsSoccer),
+    Triple("combi", "Ticket", Icons.Default.ReceiptLong),
+    Triple("stats", "Stats", Icons.Default.BarChart),
+    Triple("profil", "Profil", Icons.Default.Person),
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -141,31 +150,40 @@ fun Application(vm: AppViewModel) {
                         NavigationBarItem(
                             selected = route == r,
                             onClick = { allerA(nav, r) },
-                            icon = { Icon(icone, titre) }, label = { Text(titre) },
+                            icon = {
+                                if (r == "combi" && etat.combi.isNotEmpty())
+                                    BadgedBox(badge = { androidx.compose.material3.Badge { Text("${etat.combi.size}") } }) { Icon(icone, titre) }
+                                else Icon(icone, titre)
+                            },
+                            label = { Text(titre, fontSize = 11.sp) },
                         )
                     }
                 }
             }
         },
     ) { marges ->
-        NavHost(nav, startDestination = "matchs", modifier = Modifier.padding(marges)) {
+        val aller: (String) -> Unit = { r -> if (ONGLETS.any { it.first == r }) allerA(nav, r) else nav.navigate(r) }
+        NavHost(nav, startDestination = "accueil", modifier = Modifier.padding(marges)) {
+            composable("accueil") { EcranAccueil(etat, vm, { nav.navigate("match/$it") }, aller) }
             composable("matchs") { EcranMatchs(etat, vm) { nav.navigate("match/$it") } }
-            composable("assistant") { EcranAssistant(etat, vm) { nav.navigate("combi") } }
-            composable("confiance") { EcranConseils(etat, vm) { nav.navigate("match/$it") } }
+            composable("assistant") { EcranAssistant(etat, vm) { allerA(nav, "combi") } }
+            composable("conseils") { EcranConseils(etat, vm) { nav.navigate("match/$it") } }
+            composable("stats") { EcranStats(etat, aller) }
+            composable("profil") { EcranProfil(etat, vm, aller) }
             composable("experts") { EcranExperts(etat) }
             composable("reglages") { EcranReglages(vm, etat) }
-            composable("combi") { EcranCombi(etat, vm) }
+            composable("combi") { EcranCombi(etat, vm, aller) }
             composable("match/{id}") { e -> EcranDetail(etat.matchs[e.arguments?.getString("id")], etat, vm) }
         }
     }
 }
 
 private fun allerA(nav: NavHostController, route: String) {
-    if (route == "matchs") {
-        nav.popBackStack("matchs", inclusive = false)  // retour direct à la liste des matchs
+    if (route == "accueil") {
+        nav.popBackStack("accueil", inclusive = false)  // retour direct à l'accueil
     } else {
         nav.navigate(route) {
-            popUpTo("matchs")
+            popUpTo("accueil")
             launchSingleTop = true
         }
     }
