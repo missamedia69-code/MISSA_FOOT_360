@@ -95,3 +95,12 @@ def test_competition_sans_historique():
     m = r["championnats"][0]["matchs"][0]
     assert r["championnats"][0]["nom"] == "UEFA Champions League"
     assert m["methode"] == "Marché" and abs(m["marches"]["1"]["proba"] - 0.42) < 0.03
+
+
+def test_commission_des_bourses():
+    assert odds_api.cote_nette("betfair_ex_eu", 3.0) == pytest.approx(2.9)
+    assert odds_api.cote_nette("pinnacle", 3.0) == 3.0
+    ev = evenement("Arsenal", "Chelsea", "2099-11-22T15:00:00Z", [2.0, 3.5, 4.0], bookmakers=("pinnacle", "betfair_ex_eu"))
+    cal, _ = odds_api.vers_calendrier({"soccer_epl": [ev]}, {"E0": ["Arsenal", "Chelsea"]})
+    # Betfair affiche 4,08 mais rapporte net 1 + 3,08 × 0,95 = 3,93 < 4,0 de Pinnacle
+    assert cal.iloc[0].max_A == pytest.approx(4.0) and cal.iloc[0].bk_A == "pinnacle"

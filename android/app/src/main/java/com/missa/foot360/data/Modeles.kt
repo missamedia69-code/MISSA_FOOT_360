@@ -13,6 +13,41 @@ data class Pronostics(
     val championnats: List<Championnat> = emptyList(),
     val catalogue: List<GroupeMarche> = emptyList(),
     val fiabilite: Map<String, List<TrancheFiabilite>> = emptyMap(),
+    val value: List<ValueBet> = emptyList(),
+    val suivi_value: SuiviValue? = null,
+)
+
+/** Pari « value » : la meilleure cote du marché dépasse le prix juste du consensus. */
+@Serializable
+data class ValueBet(
+    val match_id: String,
+    val championnat: String = "",
+    val coup_envoi: String = "",
+    val domicile: String,
+    val exterieur: String,
+    val selection: String,
+    val libelle: String,
+    val proba: Double,
+    val cote_juste: Double? = null,
+    val meilleure_cote: Double,
+    val bookmaker: String? = null,
+    val valeur_brute: Double,
+    val valeur_corrigee: Double = 0.0,
+    val mise_kelly: Double = 0.0,
+)
+
+/** Bilan des paris value déjà publiés (CLV = valeur obtenue contre la cote de clôture). */
+@Serializable
+data class SuiviValue(
+    val publies: Int = 0,
+    val regles: Int = 0,
+    val en_attente: Int = 0,
+    val clv_moyen: Double? = null,
+    val clv_positif: Double? = null,
+    val clv_t_score: Double? = null,
+    val rendement: Double? = null,
+    val reussite: Double? = null,
+    val valeur_annoncee_moyenne: Double? = null,
 )
 
 @Serializable
@@ -51,6 +86,8 @@ data class Marche(
     val cote_juste: Double? = null,
     val meilleure_cote: Double? = null,
     val valeur: Double? = null,
+    val valeur_brute: Double? = null,
+    val bookmaker: String? = null,
     val confiance: Confiance? = null,
 )
 

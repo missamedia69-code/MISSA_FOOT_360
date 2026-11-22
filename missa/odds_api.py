@@ -185,21 +185,34 @@ def recuperer(cle: str, sport: str, regions: str = "eu", marches: str = "h2h,tot
         return json.loads(r.read()), (int(float(restant)) if restant is not None else None)
 
 
+# Bourses de paris : commission prélevée sur les gains -> cote réellement obtenue plus basse
+COMMISSION = {"betfair_ex_eu": 0.05, "betfair_ex_uk": 0.05, "betfair_ex_au": 0.05,
+              "matchbook": 0.02, "smarkets": 0.02}
+
+
+def cote_nette(cle_bookmaker: str, cote: float) -> float:
+    c = COMMISSION.get(cle_bookmaker, 0.0)
+    return 1 + (cote - 1) * (1 - c)
+
+
 def _cotes_evenement(ev: dict) -> dict:
     """Référence (Pinnacle sinon moyenne) et meilleures cotes : 1X2 et plus/moins 2,5."""
     h2h, tot, pin_h2h, pin_tot = [], [], None, None
+    noms_h2h, noms_tot = [], []
     dom, ext = ev["home_team"], ev["away_team"]
     for b in ev.get("bookmakers", []):
         for m in b.get("markets", []):
             o = {x["name"]: x for x in m.get("outcomes", [])}
             if m["key"] == "h2h" and {dom, ext, "Draw"} <= set(o):
-                v = [o[dom]["price"], o["Draw"]["price"], o[ext]["price"]]
+                v = [cote_nette(b["key"], o[x]["price"]) for x in (dom, "Draw", ext)]
                 h2h.append(v)
+                noms_h2h.append(b.get("title", b["key"]))
                 if b["key"] == "pinnacle":
                     pin_h2h = v
             elif m["key"] == "totals" and o.get("Over", {}).get("point") == 2.5 and "Under" in o:
-                v = [o["Over"]["price"], o["Under"]["price"]]
+                v = [cote_nette(b["key"], o[x]["price"]) for x in ("Over", "Under")]
                 tot.append(v)
+                noms_tot.append(b.get("title", b["key"]))
                 if b["key"] == "pinnacle":
                     pin_tot = v
     r = {}
@@ -208,11 +221,13 @@ def _cotes_evenement(ev: dict) -> dict:
         ref = pin_h2h if pin_h2h else a.mean(axis=0)
         for k, s in enumerate("HDA"):
             r[f"ouv_{s}"], r[f"max_{s}"] = float(ref[k]), float(a[:, k].max())
+            r[f"bk_{s}"] = noms_h2h[int(a[:, k].argmax())]
     if tot:
         a = np.array(tot, float)
         ref = pin_tot if pin_tot else a.mean(axis=0)
         for k, s in enumerate(("plus25", "moins25")):
             r[f"ouv_{s}"], r[f"max_{s}"] = float(ref[k]), float(a[:, k].max())
+            r[f"bk_{s}"] = noms_tot[int(a[:, k].argmax())]
     r["nb_bookmakers"] = len(ev.get("bookmakers", []))
     return r
 

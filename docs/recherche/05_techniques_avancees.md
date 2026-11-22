@@ -39,8 +39,9 @@ Gains par rapport au marché (log-loss, intervalle de confiance à 95 %) :
 - Boosting avec cotes : +0,00723 → **pire que le marché** (il dégrade les cotes).
 
 Scores exacts (après calage sur le marché) : Dixon-Coles 2,90071 vs Poisson indépendant 2,89959
-(différence +0,0011, IC [−0,00001 ; +0,0023]) → la correction ρ n'apporte rien une fois la matrice
-calée sur le marché ; à reconfirmer.
+(différence +0,0011, IC [−0,00001 ; +0,0023]). **Vérification sur 12 895 matchs (8 saisons) :**
++0,00057, IC [−0,0003 ; +0,0015], signe variable selon les saisons → pas de différence prouvée,
+**Dixon-Coles conservé.**
 
 Erreur de méthode évitée : combiner des modèles flexibles avec leurs propres prédictions
 d'entraînement les fait surestimer (poids 1,4 au lieu de 0,1). Il faut des prédictions hors
@@ -52,9 +53,10 @@ d'entraînement les fait surestimer (poids 1,4 au lieu de 0,1). Il faut des pré
    la littérature (le meilleur modèle de 2023 est 6,4 % moins bon que les bookmakers) ni chez nous.
    Les techniques les plus sophistiquées (boosting, deep learning) atteignent RPS ≈ 0,199, contre
    0,193 pour le marché.
-2. **Ce qui aide vraiment, modestement :** ajouter au marché des informations qu'il n'intègre pas
-   parfaitement — la forme récente en **tirs cadrés** est la seule source qui garde un poids positif
-   (≈ 0,12) et améliore la précision de façon prouvée.
+2. **Forme en tirs cadrés — vérification complémentaire (22/11/2026) :** son gain était mesuré
+   contre le marché, pas contre le moteur actuel. Comparée directement au pool actuel, la différence
+   n'est **pas significative** (selon la graine aléatoire : −0,00023 à +0,00013, IC contenant 0), et
+   une version logistique reçoit un poids quasi nul (0,02). **Non intégrée.**
 3. **Là où il reste de la marge :** la *valeur* (meilleure cote vs probabilité du consensus,
    Kaunitz/Buchdahl : +3,5 % à +9,9 % prouvés, mais limitation des comptes), le **timing**
    (parier 1 à 5 h avant le match), et les **marchés secondaires** (corners, cartons, mi-temps),
@@ -66,8 +68,8 @@ d'entraînement les fait surestimer (poids 1,4 au lieu de 0,1). Il faut des pré
 
 | Priorité | Action | Gain attendu | Effort |
 |---|---|---|---|
-| 1 | Ajouter la forme « tirs cadrés » (moyennes exponentielles) au pool | petit, prouvé (−0,0002 de log-loss en plus) | faible |
-| 2 | Passer la matrice des scores en Poisson indépendant (ρ = 0) après confirmation sur plus de données | scores exacts un peu meilleurs | faible |
+| ~~1~~ | ~~Forme « tirs cadrés » dans le pool~~ — **écarté** : pas de gain prouvé face au moteur actuel | — | — |
+| ~~2~~ | ~~Poisson indépendant (ρ = 0)~~ — **écarté** : pas de différence prouvée sur 12 895 matchs | — | — |
 | 3 | Mode « value » façon Kaunitz : signaler les meilleures cotes > consensus + marge, avec historique de CLV | le seul avantage financier prouvé | moyen |
 | 4 | Récupérer les cotes corners/cartons/mi-temps (offre payante The Odds API) pour mesurer la valeur du jumeau sur ces marchés | potentiel, à mesurer | moyen |
 | 5 | Mises : Kelly fractionnaire par sélection ; combinés seulement si chaque sélection a de la valeur | gestion du risque | faible |

@@ -46,7 +46,8 @@ class CapturesEcransTest {
         regle.onAllNodesWithText("1", useUnmergedTree = true)[0].performClick()
         regle.onAllNodesWithText("N", useUnmergedTree = true)[1].performClick()
         regle.waitForIdle()
-        regle.onNodeWithText("AFC Wimbledon - Blackpool", useUnmergedTree = true).performClick()
+        regle.onAllNodesWithText(" - ", substring = true, useUnmergedTree = true).fetchSemanticsNodes().let { }
+        regle.onAllNodesWithText("Score probable", substring = true, useUnmergedTree = true)[0].performClick()
         regle.waitForIdle()
         regle.onRoot().captureRoboImage("../../docs/captures/2_detail_resultat.png")
         regle.onNodeWithText("Mi-temps").performScrollTo().performClick()
@@ -69,8 +70,11 @@ class CapturesEcransTest {
         regle.onNodeWithText("Assistant").performClick()
         regle.waitForIdle()
         regle.onRoot().captureRoboImage("../../docs/captures/6_assistant.png")
-        regle.onNodeWithText("Confiance").performClick()
+        regle.onNodeWithText("Conseils").performClick()
         regle.waitForIdle()
         regle.onRoot().captureRoboImage("../../docs/captures/7_haute_confiance.png")
+        regle.onNodeWithText("Value", substring = true).performClick()
+        regle.waitForIdle()
+        regle.onRoot().captureRoboImage("../../docs/captures/9_value.png")
     }
 }

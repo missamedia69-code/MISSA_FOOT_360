@@ -24,7 +24,7 @@ import pandas as pd
 RACINE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RACINE))
 
-from missa import donnees, odds_api  # noqa: E402
+from missa import donnees, journal, odds_api  # noqa: E402
 from missa.pipeline import Moteur, identifiant, saisons_precedentes  # noqa: E402
 from missa.stockage import Stockage  # noqa: E402
 
@@ -142,6 +142,40 @@ def cotes_odds_api(sortie: Path) -> tuple[pd.DataFrame | None, dict]:
     return cal, info
 
 
+def charger_precedent(nom: str):
+    """Fichier de la publication précédente (branche « pronostics »), ou None."""
+    base = os.environ.get("PUBLICATION_URL", "").rstrip("/")
+    if not base:
+        return None
+    try:
+        with urllib.request.urlopen(f"{base}/{nom}", timeout=30) as r:
+            return json.loads(r.read())
+    except Exception:
+        return None
+
+
+def suivre_value(res: dict, sortie: Path) -> dict:
+    """Journal des paris value : ajout des nouveaux, clôture des matchs joués, résumé."""
+    jr = charger_precedent("journal_value.json") or []
+    ajoutes = journal.ajouter(jr, res.get("value", []))
+    attente = [j for j in jr if "gagne" not in j]
+    resultats = {}
+    for champ in {j["match_id"].split("-")[0] for j in attente}:
+        try:
+            if champ in donnees.EXTRA:
+                h = donnees.charger_extra(champ)
+            elif champ in donnees.CHAMPIONNATS:
+                h = pd.concat([donnees.charger_saison(champ, s_) for s_ in saisons_precedentes(pd.Timestamp.now(), 1)])
+            else:
+                continue
+            resultats |= journal.index_resultats(h, identifiant)
+        except Exception as e:
+            print(f"[publier] résultats {champ} indisponibles : {e}")
+    clotures = journal.cloturer(jr, resultats)
+    (sortie / "journal_value.json").write_text(json.dumps(jr, ensure_ascii=False), encoding="utf-8")
+    return journal.resume(jr) | {"ajoutes": ajoutes, "clotures": clotures}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--sortie", default=str(RACINE / "publication"))
@@ -167,6 +201,7 @@ def main():
     limite = pd.Timestamp.now(tz="UTC").tz_localize(None) - pd.Timedelta(hours=2)
     calendrier = calendrier[calendrier["coup_envoi"].fillna(calendrier["date"]) >= limite]
     res = Moteur(stockage=stockage).predire(calendrier)
+    res["suivi_value"] = suivre_value(res, sortie)
     nb = sum(len(c["matchs"]) for c in res["championnats"])
 
     (sortie / "pronostics.json").write_text(json.dumps(res, ensure_ascii=False), encoding="utf-8")
@@ -174,7 +209,7 @@ def main():
                                                 encoding="utf-8")
     etat = {"genere_le": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "matchs": nb, "championnats": [c["code"] for c in res["championnats"] if c["matchs"]],
-            "experts": rapport_experts, "the_odds_api": info_odds}
+            "experts": rapport_experts, "the_odds_api": info_odds, "suivi_value": res["suivi_value"]}
     (sortie / "etat.json").write_text(json.dumps(etat, ensure_ascii=False, indent=1), encoding="utf-8")
     print(json.dumps(etat, ensure_ascii=False, indent=1))
 

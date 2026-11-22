@@ -111,10 +111,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _etat.value.combi.any { it.matchId == matchId && it.code == code }
 
     /** Ajoute ou retire une sélection en respectant les règles du ticket ; recalcul immédiat. */
-    fun basculer(match: Match, code: String, libelle: String) {
+    fun basculer(match: Match, code: String, libelle: String, cote: Double? = null) {
         _etat.update { e ->
             val r = RegleTicket.basculer(e.combi,
-                JambeCombine(match.id, code, "${match.domicile} - ${match.exterieur}", libelle), e.unParMatch)
+                JambeCombine(match.id, code, "${match.domicile} - ${match.exterieur}", libelle, cote), e.unParMatch)
             e.copy(combi = r.ticket, message = r.message)
         }
         recalculer()

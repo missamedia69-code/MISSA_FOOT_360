@@ -45,7 +45,7 @@ import com.missa.foot360.ui.BandeauJeuResponsable
 import com.missa.foot360.ui.BarreCombi
 import com.missa.foot360.ui.EcranAssistant
 import com.missa.foot360.ui.EcranCombi
-import com.missa.foot360.ui.EcranConfiance
+import com.missa.foot360.ui.EcranConseils
 import com.missa.foot360.ui.EcranDetail
 import com.missa.foot360.ui.EcranExperts
 import com.missa.foot360.ui.EcranMatchs
@@ -65,7 +65,7 @@ class MainActivity : ComponentActivity() {
 private val ONGLETS = listOf(
     Triple("matchs", "Matchs", Icons.Default.SportsSoccer),
     Triple("assistant", "Assistant", Icons.Default.AutoAwesome),
-    Triple("confiance", "Confiance", Icons.Default.Star),
+    Triple("confiance", "Conseils", Icons.Default.Star),
     Triple("experts", "Experts", Icons.Default.Groups),
     Triple("reglages", "Réglages", Icons.Default.Settings),
 )
@@ -125,7 +125,7 @@ fun Application(vm: AppViewModel) {
         NavHost(nav, startDestination = "matchs", modifier = Modifier.padding(marges)) {
             composable("matchs") { EcranMatchs(etat, vm) { nav.navigate("match/$it") } }
             composable("assistant") { EcranAssistant(etat, vm) { nav.navigate("combi") } }
-            composable("confiance") { EcranConfiance(etat, vm) { nav.navigate("match/$it") } }
+            composable("confiance") { EcranConseils(etat, vm) { nav.navigate("match/$it") } }
             composable("experts") { EcranExperts(etat) }
             composable("reglages") { EcranReglages(vm, etat) }
             composable("combi") { EcranCombi(etat, vm) }

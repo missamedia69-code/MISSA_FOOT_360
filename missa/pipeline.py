@@ -71,6 +71,28 @@ def lambdas_depuis_marche(p1x2, p_plus25=None) -> tuple[float, float]:
     return tuple(float(v) for v in np.exp(r.x))
 
 
+SEUIL_VALUE = 0.03  # valeur minimale (3 %) : meilleure cote × probabilité − 1
+
+
+def liste_value(champs: list) -> list[dict]:
+    """Paris « value » façon Kaunitz/Buchdahl : la meilleure cote du marché dépasse le prix juste
+    estimé par le consensus (marché sans marge + moteur). Triés par valeur décroissante."""
+    out = []
+    for c in champs:
+        for m in c["matchs"]:
+            for code in m.get("selections_value", []):
+                e = m["marches"][code]
+                out.append({
+                    "match_id": m["id"], "championnat": c["nom"], "coup_envoi": m["coup_envoi"],
+                    "domicile": m["domicile"], "exterieur": m["exterieur"], "selection": code,
+                    "libelle": e["libelle"], "proba": e["proba"], "cote_juste": e["cote_juste"],
+                    "meilleure_cote": e["meilleure_cote"], "bookmaker": e.get("bookmaker"),
+                    "valeur_brute": e["valeur_brute"], "valeur_corrigee": e["valeur"],
+                    "mise_kelly": round(valeur.kelly_fractionnaire(e["proba"], e["meilleure_cote"]), 4),
+                })
+    return sorted(out, key=lambda v: -v["valeur_brute"])
+
+
 class Moteur:
     def __init__(self, stockage=None, cache: Path = donnees.CACHE):
         cfg = json.loads(MODELE.read_text()) if MODELE.exists() else {}
@@ -176,6 +198,8 @@ class Moteur:
         heures = max(0.0, (coup_envoi - maintenant).total_seconds() / 3600)
         meilleures = {"1": m.get("max_H"), "N": m.get("max_D"), "2": m.get("max_A"),
                       "plus_2.5": m.get("max_plus25"), "moins_2.5": m.get("max_moins25")}
+        chez = {"1": m.get("bk_H"), "N": m.get("bk_D"), "2": m.get("bk_A"),
+                "plus_2.5": m.get("bk_plus25"), "moins_2.5": m.get("bk_moins25")}
         marches = {}
         for code in SELECTIONS:
             p = proba_selection(P, code)
@@ -185,6 +209,9 @@ class Moteur:
                  "cote_juste": round(1 / p, 2) if p > 0 else None, "meilleure_cote": c}
             if c:
                 e["valeur"] = round(valeur.valeur_corrigee(p, c, heures), 4)
+                e["valeur_brute"] = round(valeur.valeur_attendue(p, c), 4)
+                if isinstance(chez.get(code), str):
+                    e["bookmaker"] = chez[code]
             if code in FAMILLE_DE:
                 e["confiance"] = confiance.niveau(self.calibration, FAMILLE_DE[code], p)
             marches[code] = e
@@ -200,8 +227,8 @@ class Moteur:
         principal = max(("1", "N", "2"), key=lambda c: marches[c]["proba"])
         candidats = [c for c in marches if marches[c].get("confiance", {}).get("haute_confiance")]
         sure = max(candidats, key=lambda c: marches[c]["proba"]) if candidats else None
-        values = sorted([c for c in marches if marches[c].get("valeur", -1) > 0.02],
-                        key=lambda c: -marches[c]["valeur"])
+        values = sorted([c for c in marches if marches[c].get("valeur_brute", -1) >= SEUIL_VALUE],
+                        key=lambda c: -marches[c]["valeur_brute"])
         return {
             "id": mid, "disponible": True, "championnat": champ,
             "coup_envoi": coup_envoi.isoformat() + "Z", "domicile": m["domicile"],
@@ -227,6 +254,7 @@ class Moteur:
                            "matchs": [x for x in matchs if x.get("disponible")]})
         return {"genere_le": datetime.now().isoformat(timespec="seconds"),
                 "avertissement": AVERTISSEMENT, "championnats": champs,
+                "value": liste_value(champs),
                 "catalogue": [{"groupe": g, "titre": t, "options": [{"code": c, "libelle": l} for c, l in o]}
                               for g, t, o in catalogue()],
                 "fiabilite": self.fiabilite}
