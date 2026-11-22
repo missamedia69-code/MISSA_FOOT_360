@@ -26,6 +26,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -41,7 +42,7 @@ import androidx.compose.ui.unit.sp
 import com.missa.foot360.data.Match
 import com.missa.foot360.moteur.Jumeau
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun EcranMatchs(etat: EtatApp, vm: AppViewModel, ouvrir: (String) -> Unit) {
     if (etat.chargement) {
@@ -59,7 +60,12 @@ fun EcranMatchs(etat: EtatApp, vm: AppViewModel, ouvrir: (String) -> Unit) {
     var date by remember(dates) { mutableStateOf(parDefaut) }
     val replies = remember { mutableStateMapOf<String, Boolean>() }
 
+    PullToRefreshBox(isRefreshing = etat.actualisation, onRefresh = { vm.actualiser() }) {
     LazyColumn(contentPadding = PaddingValues(bottom = 90.dp)) {
+        if (!etat.horsLigne && etat.pronostics.genere_le.isNotEmpty()) item {
+            Text("Pronostics calculés le ${dateGeneration(etat.pronostics.genere_le)} · tirez vers le bas ou touchez ⟳ pour actualiser",
+                fontSize = 11.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
+        }
         if (!etat.horsLigne && dates.isEmpty()) item {
             Text("Aucun match à venir n'est publié pour le moment. Les calendriers et les cotes sont " +
                 "mis à jour le mardi et le vendredi après-midi ; les pronostics sont recalculés " +
@@ -97,6 +103,7 @@ fun EcranMatchs(etat: EtatApp, vm: AppViewModel, ouvrir: (String) -> Unit) {
                 CarteMatch(m, vm, etat) { ouvrir(m.id) }
             }
         }
+    }
     }
 }
 

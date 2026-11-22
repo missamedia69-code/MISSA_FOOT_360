@@ -33,12 +33,17 @@ data class EtatApp(
     val bonus: Double = 0.0,
     val unParMatch: Boolean = true,
     val mise: Double? = null,
+    val actualisation: Boolean = false,
     val message: String? = null,
 ) {
     val matchs: Map<String, Match> by lazy {
         pronostics.championnats.flatMap { it.matchs }.associateBy { it.id }
     }
 }
+
+/** « 2026-11-22T10:36:21 » -> « 22/11 à 10:36 UTC ». */
+fun dateGeneration(iso: String): String =
+    if (iso.length < 16) iso else "${iso.substring(8, 10)}/${iso.substring(5, 7)} à ${iso.substring(11, 16)} UTC"
 
 /** Famille de fiabilité d'un code (même règle que scripts/valider_jumeau.py). */
 fun familleFiabilite(code: String): String = when {
@@ -88,6 +93,31 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 erreur = r.erreur, experts = experts)
         }
         recalculer()
+    }
+
+    /** Bouton « Actualiser » : télécharge la dernière publication sans vider l'écran ni le ticket.
+     *  Les sélections de matchs qui ne sont plus publiés (déjà joués) sont retirées du ticket. */
+    fun actualiser() {
+        if (_etat.value.actualisation) return
+        viewModelScope.launch {
+            _etat.update { it.copy(actualisation = true) }
+            val r = depot.pronostics()
+            val experts = depot.pronostiqueurs()
+            cacheJumeaux.clear()
+            _etat.update { e ->
+                val ids = r.pronostics.championnats.flatMap { c -> c.matchs.map { it.id } }.toSet()
+                val gardees = e.combi.filter { it.matchId in ids }
+                val retirees = e.combi.size - gardees.size
+                e.copy(actualisation = false, pronostics = r.pronostics, horsLigne = r.horsLigne, erreur = r.erreur,
+                    experts = experts, combi = gardees,
+                    message = when {
+                        r.horsLigne -> "Pas de connexion : données de démonstration affichées."
+                        retirees > 0 -> "Pronostics à jour. $retirees sélection(s) retirée(s) : match(s) déjà commencé(s)."
+                        else -> "Pronostics à jour (calculés le ${dateGeneration(r.pronostics.genere_le)})."
+                    })
+            }
+            recalculer()
+        }
     }
 
     /** Jumeau du match (avec la modulation choisie par l'utilisateur). */

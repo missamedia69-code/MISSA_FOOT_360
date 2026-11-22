@@ -5,6 +5,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -107,6 +114,16 @@ fun Application(vm: AppViewModel) {
                 navigationIcon = {
                     if (route != null && ONGLETS.none { it.first == route }) {
                         IconButton({ nav.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Retour") }
+                    }
+                },
+                actions = {
+                    // Bouton « Actualiser » : l'icône tourne pendant le téléchargement
+                    val rotation = rememberInfiniteTransition(label = "rotation")
+                    val angle by rotation.animateFloat(0f, 360f,
+                        infiniteRepeatable(tween(900, easing = LinearEasing)), label = "angle")
+                    IconButton(onClick = { vm.actualiser() }) {
+                        Icon(Icons.Default.Refresh, "Actualiser", tint = Vert,
+                            modifier = if (etat.actualisation) Modifier.graphicsLayer { rotationZ = angle } else Modifier)
                     }
                 },
             )
