@@ -16,7 +16,8 @@ Moteur de pronostic de matchs de football fondé sur la recherche (voir `docs/re
 
 Les principes, les bases mathématiques et l'agencement en couches de ces briques (marge,
 Dixon-Coles, Elo, pool logarithmique, raking, jumeau numérique, calibration, décision,
-validation) sont détaillés dans `docs/recherche/07_principes_et_agencement_misa_tv.md`.
+validation) sont détaillés dans `docs/recherche/07_principes_et_agencement_misa_tv.md`
+et dans sa version texte brut `MISA-TV_principes_et_agencement.txt`.
 
 ## Structure
 
