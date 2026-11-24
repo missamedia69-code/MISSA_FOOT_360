@@ -82,7 +82,17 @@ modulations, combinés officiels, ticket multi-matchs) :
 ```
 
 Le harnais `web/tests/jumeau_node.mjs` exécute le moteur JS sous Node et
-`web/tests/parite.py` compare ses résultats à `missa/jumeau.py`.
+`web/tests/parite.py` compare ses résultats à `missa/jumeau.py`. Le test
+`tests/test_jumeau_web.py` relance cette comparaison depuis `pytest` (ignoré si
+NumPy, SciPy ou Node sont absents).
+
+### Intégration continue
+
+`.github/workflows/web.yml` rejoue à chaque `push` / pull request : syntaxe
+JavaScript, génération des données hors ligne, parité des 409 probabilités et
+suite `pytest`. C'est le garde-fou contre toute divergence entre
+`missa/jumeau.py` et son port navigateur. Lancement manuel possible depuis
+l'onglet « Actions ».
 
 ## Fichiers
 

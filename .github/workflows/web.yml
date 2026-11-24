@@ -1,0 +1,51 @@
+# Vérifications de la version web : syntaxe JS, génération des données,
+# parité du jumeau numérique avec le moteur Python et suite de tests.
+name: Web — moteur et parité
+
+on:
+  push:
+    paths:
+      - "web/**"
+      - "missa/jumeau.py"
+      - "tests/**"
+      - "requirements.txt"
+      - ".github/workflows/web.yml"
+  pull_request:
+  workflow_dispatch:          # lancement manuel depuis l'onglet « Actions »
+
+permissions:
+  contents: read
+
+jobs:
+  verifier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Installer les dépendances Python
+        run: pip install -r requirements.txt fastapi httpx
+
+      - name: Vérifier la syntaxe JavaScript
+        run: |
+          node --check web/js/jumeau.js
+          node --check web/js/app.js
+          node --check web/tests/jumeau_node.mjs
+
+      - name: Générer les données hors ligne
+        run: python web/scripts/preparer_donnees.py
+
+      - name: Comparer les 409 probabilités navigateur ↔ Python
+        run: python web/tests/parite.py
+
+      - name: Exécuter la suite de tests
+        run: python -m pytest -q

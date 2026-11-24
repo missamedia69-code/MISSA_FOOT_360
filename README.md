@@ -84,6 +84,10 @@ Le fichier `.github/workflows/pronostics.yml` lance `scripts/publier.py` toutes 
 
 L'application lit cette adresse par défaut. Coût : 0 € (quelques minutes d'exécution par jour).
 
+Un second workflow, `.github/workflows/web.yml`, vérifie à chaque `push` la version web :
+syntaxe JavaScript, génération des données hors ligne, parité des 409 probabilités
+entre `web/js/jumeau.js` et `missa/jumeau.py`, puis la suite `pytest`.
+
 ### Cotes en continu : The Odds API (facultatif)
 
 1. Créer une clé gratuite sur https://the-odds-api.com (500 crédits/mois).
