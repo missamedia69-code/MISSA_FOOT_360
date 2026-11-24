@@ -34,7 +34,11 @@ Moteur de pronostic de matchs de football fondé sur la recherche (voir `docs/re
 | `missa/confiance.py` | Mode haute confiance : taux de réussite réel mesuré par niveau de probabilité |
 | `missa/stockage.py` | Base SQLite des pronostiqueurs (pronostics non modifiables, refusés après le coup d'envoi) |
 | `missa/pipeline.py` | Pronostics des prochains matchs (marché + modèles + pronostiqueurs) |
-| `api/main.py` | API FastAPI consommée par l'application Android |
+| `api/main.py` | API FastAPI consommée par les applications Android et web |
+| `web/js/jumeau.js` | **Jumeau numérique en JavaScript** (port sans dépendance de `missa/jumeau.py`, parité < 1e-13) |
+| `web/js/app.js`, `web/index.html`, `web/css/styles.css` | Application web en 5 modules : Accueil, Analyses, Ticket, Stats, Profil |
+| `web/serveur.py` | Serveur statique (stdlib) + relais `/api/*` vers l'API FastAPI |
+| `web/scripts/preparer_donnees.py` | Prépare `web/data/donnees.json` depuis les pronostics ou la démo |
 | `android/` | Application Android (Kotlin, Jetpack Compose) |
 | `scripts/lancer_backtest.py` | Backtest complet → `docs/resultats_backtest.md`, `data/modele.json`, `data/calibration.json` |
 | `scripts/generer_pronostics.py` | Pronostics des prochains matchs → `data/pronostics.json` |
@@ -49,6 +53,10 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python scripts/valider_jumeau.py       # valide le jumeau et ses paramètres (≈ 4 min)
 .venv/bin/python scripts/generer_pronostics.py   # pronostics des prochains matchs
 MISSA_CLE_ADMIN=un-secret .venv/bin/uvicorn api.main:app --host 0.0.0.0 --port 8000
+
+# Application web (aucune dépendance npm)
+python3 web/scripts/preparer_donnees.py
+python3 web/serveur.py                       # http://0.0.0.0:8080
 ```
 
 ### Ajouter un pronostic d'expert (avant le coup d'envoi uniquement)
@@ -96,6 +104,32 @@ fois par jour ≈ 480 crédits/mois, dans l'offre gratuite. Avec une offre payan
 exemple `ODDS_API_FREQUENCE_HEURES = 3`. Les matchs de The Odds API remplacent ceux de
 football-data quand les deux existent ; les noms d'équipes non reconnus sont listés dans
 `etat.json` (champ `the_odds_api.noms_non_reconnus`).
+
+## Application web (5 modules, aperçu en direct)
+
+`web/` propose la même expérience que l'application Android dans le navigateur :
+**Accueil** (recommandations, valeurs, calibration), **Analyses** (113 matchs par
+date et championnat), **Détail** (193 marchés, modulation en direct, forme,
+matrice des scores), **Ticket** (probabilité exacte du combiné, valeur, Kelly,
+assistant de combiné), **Stats** (validation sur saisons jamais vues) et
+**Profil** (réglages, experts CLV, historique des tickets).
+
+Le moteur de probabilités tourne **dans le navigateur** : `web/js/jumeau.js` est
+un port de `missa/jumeau.py` (loi jointe mi-temps/score final, corners, cartons,
+expressions ET/OU, modulations). La parité est vérifiée sur 409 probabilités
+(`web/tests/parite.py`, écart maximal ≈ 1,3 × 10⁻¹⁴). Aucune dépendance npm ni
+compilation ; les données viennent de `data/pronostics.json` s'il existe, sinon
+de la démonstration hors ligne.
+
+```bash
+python3 web/scripts/preparer_donnees.py
+python3 web/serveur.py --port 8080
+```
+
+Pour brancher les pronostics en direct, lancer l'API sur le port 8000 puis
+indiquer `/api` dans « Profil → Réglages » : `web/serveur.py` relaie `/api/*`
+vers FastAPI depuis la même origine (pas de CORS). Captures : `docs/captures_web/`.
+Voir `web/README.md`.
 
 ## Application Android
 

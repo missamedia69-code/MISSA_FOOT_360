@@ -1,0 +1,10 @@
+{
+  "name": "missa-foot-360-web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Application web MISSA FOOT 360 — aucune dépendance npm, moteur de probabilités en ES modules.",
+  "scripts": {
+    "test:parite": "python3 web/tests/parite.py"
+  }
+}
