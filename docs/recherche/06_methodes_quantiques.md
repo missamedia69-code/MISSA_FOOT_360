@@ -1,5 +1,8 @@
 # Notes de recherche — Méthodes « quantiques » / « surnaturelles » (24/11/2026)
 
+> Pour les **principes, les bases mathématiques et l'agencement en couches** de toutes
+> ces briques dans l'application, voir `07_principes_et_agencement_misa_tv.md`.
+
 Question posée : existe-t-il des méthodes de prédiction de matchs « surnaturelles »,
 issues des mathématiques quantiques ? Réponse courte : **oui, il existe des méthodes
 quantiques (réelles, publiées), mais aucune n'est surnaturelle et aucune n'a fait la

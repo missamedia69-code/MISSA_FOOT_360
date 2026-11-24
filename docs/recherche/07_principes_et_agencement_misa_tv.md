@@ -1,0 +1,436 @@
+# Principes mathématiques et agencement pour MISA-TV (24/11/2026)
+
+> **Note de nommage** : le dépôt s'appelle **MISSA FOOT 360**. « MISA-TV » est traité ici
+> comme le nom produit de l'application de pronostic (interface web/TV). S'il s'agit d'un
+> produit distinct, les principes ci-dessous restent valables, seule la couche de
+> présentation change. Aucune brique de diffusion vidéo / EPG n'est décrite ici.
+
+Objectif de ce document : **définir le principe, la base mathématique et l'application de
+chaque élément**, puis expliquer **comment les agencer pour obtenir un résultat fiable**.
+
+⚠️ Préalable : « très fiable » ne veut pas dire « 90 % de gagnants ». Un match de football
+reste largement aléatoire ; le consensus des bookmakers plafonne autour de RPS ≈ 0,193 et
+log-loss ≈ 0,96 sur le 1X2 (`docs/recherche/04_experiences.md`). La fiabilité, c'est :
+**des probabilités calibrées, cohérentes entre elles, reproductibles, testées hors
+échantillon, et présentées sans promesse**. C'est un propriété de la chaîne entière, jamais
+d'un seul modèle, aussi « quantique » soit-il.
+
+---
+
+## 1. Les briques, une par une
+
+### 1.1 Retrait de la marge du bookmaker — `missa/marge.py`
+
+**Principe.** Une cote `O_i` n'est pas une probabilité : `Σ 1/O_i = 1 + M` avec `M > 0`
+(marge du bookmaker). Il faut estimer les probabilités « justes » `p_i` qui auraient produit
+ces cotes.
+
+**Base.** `M = Σ 1/O_i − 1`. Méthodes implémentées :
+
+```
+egale           : p_i = (1/O_i) / Σ(1/O_j)                       (biais favori/outsider)
+proportionnelle : O_juste_i = n·O_i / (n − M·O_i)  (Buchdahl)
+puissance       : p_i = (1/O_i)^k , k tel que Σ p_i = 1         (résolu par brentq)
+odds_ratio      : x_i / (c − c·x_i + x_i), c commun             (Cheung)
+shin            : π_i(z) = (√(z² + 4(1−z)x_i²/s) − z) / (2(1−z)), z = part d'informés
+abrams (2 issues) : formule fermée logarithmique
+```
+
+**Application.** Point d'entrée de tout le moteur : `marge.probabilites(cotes_ouverture,
+"puissance")` pour le 1X2, `"abrams"` pour plus/moins 2,5. Sans cette étape, toutes les
+valeurs affichées seraient systématiquement pessimistes de la marge.
+
+**Limite.** La méthode `egale` sous-estime les favoris ; `shin` est meilleure sur 3 issues mais
+suppose un marché informé. Le choix de la méthode doit être fixé par backtest, pas par goût.
+
+### 1.2 Dixon-Coles / Poisson bivarié corrigé — `missa/dixon_coles.py`
+
+**Principe.** Le nombre de buts de chaque équipe suit une loi de Poisson dont l'intensité
+dépend de la force d'attaque de l'équipe, de la faiblesse défensive de l'adversaire et de
+l'avantage du terrain. Dixon-Coles ajoute une correction des **petits scores**, où le
+Poisson indépendant sous-estime les 0-0 et 1-1.
+
+**Base.**
+
+```
+log λ = h + attaque[dom] + defense[ext]        # buts attendus domicile
+log μ =     attaque[ext] + defense[dom]        # buts attendus extérieur
+P(x,y) = τ(x,y) · Pois(x;λ) · Pois(y;μ)
+
+τ(0,0)=1−λμρ   τ(0,1)=1+λρ   τ(1,0)=1+μρ   τ(1,1)=1−ρ   τ=1 sinon
+poids(match) = exp(−ξ · jours_écoulés),  ξ ≈ 0,0019/jour
+NLL = −Σ w·[log τ + x·log λ − λ + y·log μ − μ] + 10·(Σ attaque)² + 1e-3·‖θ‖²
+```
+
+Optimisation L-BFGS-B avec gradient analytique ; contrainte `Σ attaque = 0` pour
+l'identifiabilité ; régularisation L2 pour les équipes peu observées.
+
+**Application.** Produit `(λ, μ)` et une première matrice 10×10 des scores, ainsi que
+`P(1X2)`, `P(plus/moins 2,5)`, `P(BTTS)`, `P(score exact)`. Sert aussi, avec `rho_fixe=0`,
+aux **corners** et **cartons** (`missa/comptages.py`).
+
+**Limite.** Aucun gain hors échantillon prouvé face au marché une fois celui-ci ancré :
+Dixon-Coles seul RPS 0,20005 contre 0,19332 pour le marché. Il est conservé parce qu'il
+fournit une **structure de scores**, pas parce qu'il « prédit mieux ».
+
+### 1.3 Elo + régression logistique ordonnée — `missa/elo.py`, `missa/backtest.py`
+
+**Principe.** Une note par équipe, mise à jour après chaque match proportionnellement à
+l'écart entre résultat observé et résultat attendu. L'écart de notes est ensuite converti
+en probabilités 1N2 par un modèle ordinal.
+
+**Base.**
+
+```
+E = 1 / (10^(−(note_dom + 70 − note_ext)/400) + 1)
+Δ = K · g(écart_buts) · (résultat − E),   K = 20, g = 1 / 1,5 / (11+n)/8
+p_dom      = σ(c1 + b·x),  p_dom_ou_nul = σ(c2 + b·x),  c2 > c1
+p = [p_dom, p_dom_ou_nul − p_dom, 1 − p_dom_ou_nul]
+```
+
+Régression partielle vers la moyenne en début de saison (`regression = 0,2`) ; les promus
+démarrent à la moyenne des notes basses.
+
+**Application.** Deuxième source du pool ; utile quand les cotes manquent ou pour les
+championnats peu couverts.
+
+**Limite.** Ne modélise pas les scores, seulement l'issue ; sensible au choix de `K`.
+
+### 1.4 Forme récente et régression logistique multinomiale — `missa/forme.py`
+
+**Principe.** Moyennes exponentielles des buts **et des tirs cadrés** pour/contre, calculées
+**avant** chaque match (anti-fuite), puis transformées en 1N2 par un softmax linéaire.
+
+**Base.** `a = 1 − 0,5^(1/demi_vie)` avec `demi_vie = 8` matchs ; 10 variables
+(buts pour/contre, cadres pour/contre, repos, pour chaque équipe). Le modèle minimise
+`−Σ y_k log p_k + (l2/n)‖W‖²` avec normalisation `(X−moy)/ect`, coefficients stockés
+dans `data/modele.json` (portables, sans dépendance).
+
+**Application.** Testée comme source supplémentaire du pool (E4b/E4d).
+
+**Limite.** Résultat important du dépôt (`docs/recherche/05_techniques_avancees.md`) : comparée au **pool actuel**,
+la forme n'apporte **aucun gain significatif** (IC contenant 0) ; la version logistique
+reçoit un poids ≈ 0,02. **Non intégrée en production.** C'est un exemple de « brique
+mathématiquement propre mais inutile une fois le marché ancré ».
+
+### 1.5 Pool logarithmique (stacking) — `missa/combinaison.py`
+
+**Principe.** Combiner plusieurs estimations `p_s` en une seule, en apprenant le poids de
+chaque source sur des saisons passées. La combinaison se fait dans l'espace des **log-probabilités**
+(produit pondéré de probabilités), pas par moyenne arithmétique.
+
+**Base.**
+
+```
+score_k = Σ_s w_s · log p_{s,k} + b_k
+p_k     = softmax(score)_k
+w* = argmin −(1/n) Σ log p_{y_i}  + λ·Σ (w_s − w_prior_s)²
+w_prior = (1, 0, 0, …)      # confiance totale a priori dans le marché
+```
+
+`λ = 1e-3`, `b_1 = 0` (identifiabilité), optimisation L-BFGS-B. Poids déployés
+(`data/modele.json`) : `marche_ouv = 1,055`, `dixon_coles = −0,061`, `elo = −0,016`,
+biais `[0, 0,0289, 0,0241]`.
+
+**Application.** C'est le cœur de l'agrégation : une source qui n'apporte rien voit son
+poids tendre vers 0 ; le marché reste l'ancrage.
+
+**Limites (deux règles apprises douloureusement).**
+1. Les prédictions des modèles flexibles doivent être **hors échantillon** (validation
+   croisée par saison) avant d'entrer dans le pool ; sinon les poids explosent (1,4 au lieu
+   de 0,1) — voir `docs/recherche/05_techniques_avancees.md`.
+2. Les poids peuvent être négatifs (contraste entre sources) ; cela se justifie
+   statistiquement mais doit être borné/régularisé, sinon on obtient des probabilités
+   instables sur des matchs atypiques.
+
+### 1.6 Raking / calage de la matrice des scores — `missa/selections.py`
+
+**Principe.** On dispose d'une matrice `P(i,j)` issue de `(λ, μ, ρ)` et d'un vecteur 1X2
+final issu du pool. Il faut rendre la matrice **compatible** avec ce vecteur (et avec la
+probabilité plus/moins 2,5), sans détruire sa forme.
+
+**Base.** Itérations proportionnelles (IPF / raking) : pour chaque zone `m` et cible `c`,
+`P[m] *= c / P[m].sum()`, répété 100 fois sur les deux familles de contraintes, puis
+renormalisation.
+
+**Application.** Étape de **cohérence** : tous les marchés dérivés de la matrice (score
+exact, BTTS, handicaps, mi-temps…) affichent exactement la même probabilité 1X2 que le
+pool. Sans elle, l'application pourrait dire « 1 à 45 % » et « 1 & BTTS oui à 48 % ».
+
+### 1.7 Loi jointe 1re mi-temps / score final — `missa/jumeau.py`, `web/js/jumeau.js`
+
+**Principe.** Sachant le score final `(i,j)`, répartir ces buts entre les deux mi-temps par
+une loi binomiale. La part de 1re mi-temps augmente légèrement avec le nombre total de buts.
+
+**Base.**
+
+```
+s(i,j) = clip(a + b·(i+j), 0,05, 0,95),  a = 0,4180, b = 0,008589
+G[a,b,i,j] = P(i,j) · Binom(a; i, s) · Binom(b; j, s)
+MT2 = (i−a, j−b)
+```
+
+Grille 4 dimensions 10×10×10×10 en Python, calculée à la demande et mise en cache ;
+port exact en JavaScript sans dépendance (Lanczos pour log Γ).
+
+**Application.** Marchés `@MT1`, `@MT2`, mi-temps/fin de match, mi-temps la plus
+prolifique, « gagne les 2 mi-temps », etc. Paramètres mesurés sur 22 832 matchs.
+
+### 1.8 Corners : binomiale négative + bêta-binomiale
+
+**Principe.** Le **total** de corners est sur-dispersé (variance > moyenne) ; sa
+**répartition** entre les deux équipes est corrélée négativement (quand l'une attaque,
+l'autre subit).
+
+**Base.**
+
+```
+T ~ NB(k, p = k/(k+m)),  Var(T) = m + m²/k,  k = 55,987
+X | T=t ~ BetaBinom(t, p·c, (1−p)·c),  c = 1/ρ − 1,  ρ = 0,0866
+P(x,y) = P(T=x+y) · P(X=x | T=x+y)
+```
+
+`ρ → 0` redonne une binomiale (indépendance). `k → ∞` redonne Poisson.
+
+**Application.** 12 marchés corners, cohérents avec les buts mais indépendants d'eux.
+
+### 1.9 Cartons : Poisson bivariée par latent commun
+
+**Principe.** Les cartons des deux équipes sont positivement corrélés : un match tendu
+produit des cartons **des deux côtés**. On fabrique cette corrélation avec un terme commun.
+
+**Base.** `X = U + W`, `Y = V + W` avec `U ~ Pois(m1−w)`, `V ~ Pois(m2−w)`,
+`W ~ Pois(w)` ; alors `Cov(X,Y) = w`, ici `w = 0,3287`, borné à `0,95·min(m1,m2)`.
+
+**Application.** Marchés « total cartons », « plus de cartons », etc.
+
+### 1.10 Grammaire des sélections et combinés — `missa/jumeau.py`, `missa/selections.py`
+
+**Principe.** Un marché = un **masque booléen** sur une grille de probabilité. `|` = OU
+(union de masques), `&` = ET (intersection), les composantes (buts, corners, cartons) sont
+indépendantes entre elles et le produit se fait sur les masses des grilles.
+
+**Base.**
+
+```
+P(A ∪ B) = Σ_{masque_A ∨ masque_B} P          (PAS p_A + p_B : il y a recouvrement)
+P(A ∩ B) = Σ_{masque_A ∧ masque_B} P          (corrélation exacte dans le même match)
+P(ticket) = Π_{matchs} p_match                (indépendance entre matchs)
+```
+
+**Application.** 193 marchés dérivés d'**une seule** loi ; probabilité exacte d'un combiné
+officiel du type `1X2:1 & BTTS:oui`, et d'un ticket multi-matchs. C'est ce qui évite
+l'erreur classique « multiplier des probabilités corrélées » (un `1` et un `plus de 1,5
+buts domicile` ne sont pas indépendants).
+
+### 1.11 Modulation exponentielle (exponential tilting) — `JumeauMatch.moduler`
+
+**Principe.** L'utilisateur corrige le modèle (attaquant vedette absent, pluie, arbitre
+sévère) sans casser la normalisation ni la structure.
+
+**Base.** `P'(i,j) ∝ P(i,j) · f_dom^i · f_ext^j`. Exact pour une loi de Poisson :
+multiplier λ par `f` revient à `P'(x) ∝ P(x)·f^x`. Les moyennes corners/cartons sont
+multipliées directement ; la matrice est renormalisée.
+
+**Application.** Curseurs « Attaque », « Corners », « Cartons » de l'écran Détail, avec
+recalcul instantané des 193 marchés dans le navigateur.
+
+**Limite.** Correctif **subjectif** : il doit rester borné (par exemple 0,7–1,3) et être
+journalisé, sinon il devient une source de surconfidence invisible.
+
+### 1.12 Avis d'experts et CLV — `missa/pronostiqueurs.py`
+
+**Principe.** Ne jamais juger un pronostiqueur sur son profit ou son taux de réussite (trop
+de hasard), mais sur sa capacité à **battre la cote de clôture**.
+
+**Base.** `CLV = cote_conseillée × proba_juste_clôture − 1` ; t-score de la moyenne des CLV,
+`n ≥ 50`, `|t| ≥ 2`, régression du talent `× 0,7`, ajustement relatif plafonné à ±10 %
+par expert et ±15 % cumulé. L'ajustement multiplie les cases compatibles de la matrice puis
+renormalise.
+
+**Application.** Module « Experts » du Profil ; affichage de l'avis même quand l'ajustement
+est nul (pas encore de preuve).
+
+### 1.13 Calibration, fiabilité et confiance — `missa/confiance.py`, `data/*.json`
+
+**Principe.** Une probabilité est fiable si, sur tous les matchs annoncés à 70 %, on observe
+environ 70 % de réussite. On mesure donc l'écart annoncé/observé par tranche et par famille
+de marchés, sur des saisons jamais vues.
+
+**Base.** Courbe de fiabilité : `annonce = mean(p | p∈[lo,hi])`, `observe = mean(y | p∈[lo,hi])`,
+effectif `n` ; seuil `N_MIN = 50` avant d'accorder le label « haute confiance », sinon on
+écrête le taux vers la probabilité annoncée (shrinkage). `data/fiabilite_marches.json`
+contient 6 familles ; `data/calibration.json` contient les tranches 1X2, double chance,
+buts 2,5, BTTS avec rendement réel.
+
+**Application.** L'app affiche « taux historique mesuré sur N sélections » au lieu d'une
+promesse, et le badge de confiance est calculé depuis la table, pas depuis l'humeur du
+modèle. Exemple mesuré : annoncé 0,6467 → observé 0,6495 sur 28 478 sélections.
+
+### 1.14 Scores propres, incertitude et décision — `missa/evaluation.py`, `missa/valeur.py`
+
+**Principe.** Évaluer une **distribution**, pas un pourcentage de bons pronostics ; puis ne
+parier que si le prix est avantageux, avec une mise bornée.
+
+**Base.**
+
+```
+RPS(p,y)    = mean( Σ_{k=1..2} (cumul(p)_k − cumul(1_y)_k)² / 2 )   # ordinal, 0 = parfait
+log-loss    = −mean(log p_y)
+Brier       = mean(Σ (p_k − 1_{y=k})²)
+EV          = p · O − 1
+EV_corrigé  = EV × retention(heures_avant_match)  si EV > 0
+Kelly       = (p·O − 1)/(O − 1),  mise = min(0,02, 0,25·Kelly)
+CLV         = cote_prise / cote_juste_clôture − 1
+```
+
+`RETENTION = (0,70 ; 0,45 ; 0,25 ; 0,10)` selon `< 1 h`, `1–6 h`, `6–24 h`, `> 24 h`.
+`SEUIL_VALUE = 0,03`.
+
+**Application.** `scripts/experiences.py` compare les modèles par RPS/log-loss/Brier avec
+**intervalle de confiance à 95 % par bootstrap** ; le module Décision produit l'espérance,
+la valeur corrigée du délai et la mise Kelly fractionnaire.
+
+### 1.15 Le registre quantique (hors chaîne critique)
+
+Voir `docs/recherche/06_methodes_quantiques.md`. Résumé des principes :
+
+| Brique | Base | Usage honnête |
+|---|---|---|
+| QNN / circuits variationnels | `|ψ(x)⟩ = U(θ)·Enc(x)`, `p = ⟨ψ|Π|ψ⟩` (règle de Born) | recherche, simulateur |
+| Noyau quantique / QSVM | `K(x,x') = |⟨φ(x)|φ(x')⟩|²` | benchmark : aucun gain significatif sur 9 jeux tabulaires |
+| Recuit / QUBO-Ising | `min xᵀQx`, `H = Σ h_i s_i + Σ J_ij s_i s_j` | **sélection de variables hors ligne**, exécutable sur CPU |
+| Réseaux tensoriels (MPS) | décomposition `W ≈ Π A^{(s_i)}`, entropie d'intrication | compression / interprétation de séquences |
+| QAE | erreur `1/N` au lieu de `1/√N` | théorique, nécessite qubits corrigés |
+| Probabilité « quantum-like » | espaces de Hilbert, non-commutativité, interférence | modéliser **le parieur**, pas le match |
+
+Aucune de ces briques ne doit être insérée dans le chemin de production avant d'avoir battu
+le marché avec un IC bootstrap ne contenant pas 0.
+
+---
+
+## 2. Agencement : l'architecture en couches
+
+```mermaid
+flowchart TD
+    D[Données horodatées<br/>cotes ouverture/clôture + historiques] --> M[1. Retrait de marge<br/>marché = ancrage]
+    M --> S[2. Modèles structurels<br/>Dixon-Coles · Elo · comptages · forme]
+    M --> P[3. Pool logarithmique<br/>poids appris hors échantillon]
+    S --> P
+    S --> R[4. Matrice 10×10 + raking IPF<br/>cohérence 1X2 / O-U 2,5]
+    P --> R
+    R --> J[5. Jumeau numérique<br/>1re MT · corners · cartons · 193 marchés]
+    J --> A[6. Ajustements bornés<br/>experts CLV · modulation exponentielle]
+    A --> C[7. Calibration & fiabilité<br/>tranches mesurées · shrinkage · N_MIN]
+    C --> V[8. Décision<br/>EV · rétention · Kelly fractionnaire · CLV]
+    V --> E[9. Validation continue<br/>RPS/log-loss/Brier · bootstrap · parité JS↔Python · CI]
+    E -. réétalonnage périodique .-> C
+```
+
+### Pourquoi cet ordre ?
+
+Chaque couche corrige un type d'erreur différent :
+
+| Couche | Erreur corrigée | Ce qui casserait si on la supprimait |
+|---|---|---|
+| 1. Marge | biais systématique du bookmaker | probabilités trop faibles, « valeur » fictive |
+| 2. Modèles | absence de structure de scores | impossible de dériver corners, mi-temps, scores exacts |
+| 3. Pool | bruit d'une source unique | surconfiance ou modèle unique fragile |
+| 4. Raking | incohérence entre marchés | « 1 à 45 % » mais « 1 & BTTS à 48 % » |
+| 5. Jumeau | corrélation ignorée | combinés du même match sous-évalués |
+| 6. Ajustements | information humaine non mesurable | avis d'expert sans preuve qui pèse trop |
+| 7. Calibration | surconfidence du modèle | 80 % annoncés → 70 % observés |
+| 8. Décision | confusion probabilité / rentabilité | mise disproportionnée, pas de CLV |
+| 9. Validation | fuite, dérive, régression | « ça marchait l'an dernier » |
+
+### Règle d'or : un seul objet probabiliste, plusieurs vues
+
+Le point le plus important de l'agencement est le **passage par une matrice de scores
+unique**. On n'entraîne pas 193 modèles : on calibre une loi jointe, puis on dérive tous les
+marchés par des masques. Conséquences :
+
+- **cohérence arithmétique** garantie (pas d'arbitrage interne) ;
+- **parité** vérifiable : `web/tests/parite.py` compare 409 probabilités JS ↔ Python,
+  écart maximal `1,277 × 10⁻¹⁴` ;
+- **une seule calibration** à maintenir au lieu de 193 ;
+- **modulation** : un seul paramètre recalcule instantanément tout le catalogue.
+
+---
+
+## 3. La recette de fiabilité (10 règles contraignantes)
+
+1. **Ancrer sur le marché.** `w_prior = (1, 0, …)` et régularisation L2 vers ce prior.
+   Les poids déployés confirment l'ancrage : marché 1,055, les autres quasi nuls.
+2. **Apprendre seulement sur le passé.** Entraînement `2019/20 → 2022/23`, test
+   `2023/24 → 2026/27` (5 661 matchs jamais vus). Aucune statistique calculée après le
+   coup d'envoi ne peut entrer dans une variable.
+3. **Prédictions hors échantillon avant stacking.** Validation croisée par saison pour
+   tout modèle flexible (règle ajoutée après l'erreur des poids à 1,4).
+4. **Cohérence avant affichage.** Raking + grammaire à masques ; interdire la
+   multiplication de probabilités d'un même match.
+5. **Calibrer par famille, pas globalement.** `1X2`, `double_chance`, `buts_2.5`, `btts`,
+   puis les 6 familles du jumeau ; effectif minimal 50 par tranche.
+6. **Shrinkage systématique.** Quand `n` est faible, écrêter le taux historique vers
+   l'annonce ; ne jamais afficher un taux supérieur à la probabilité sans preuve.
+7. **Mesurer avec des scores propres.** RPS, log-loss, Brier **et IC bootstrap** ; une
+   différence de `−0,0008` de log-loss avec IC `[−0,00154 ; −0,00004]` est un signal
+   fragile, pas une victoire. Ne jamais communiquer une « accuracy » isolée.
+8. **Suivre le CLV, pas le profit court terme.** C'est le seul indicateur dont le talent
+   persiste (pente ≈ 0,7).
+9. **Borner l'humain et le risque.** Ajustement expert ≤ 10 %, cumul ≤ 15 %,
+   modulation bornée, Kelly fractionnaire plafonné à 2 % de bankroll, seuil de valeur 3 %.
+10. **Rendre la chaîne reproductible.** Graines fixées, `data/modele.json` versionné,
+   parité JS ↔ Python en CI (`.github/workflows/web.yml`), rejeu de
+   `scripts/experiences.py` à chaque changement de moteur.
+
+## 4. Ce qu'on peut attendre réellement
+
+Repères mesurés dans le dépôt (test 5 661 matchs jamais vus) :
+
+| Modèle | RPS | Log-loss |
+|---|---|---|
+| Marché à la clôture (plafond) | 0,19268 | 0,96054 |
+| Marché avant clôture (référence) | 0,19332 | 0,96281 |
+| **Pool + DC + Elo + forme (E4d)** | **0,19316** | **0,96201** |
+| Gradient boosting avec cotes | 0,19468 | 0,97004 |
+| Dixon-Coles seul | 0,20005 | 0,98690 |
+
+Le gain du pool est **réel mais minuscule** et son intervalle de confiance frôle 0 ; le
+modèle du challenge 2023 reste 6,4 % moins bon que le consensus. Le seul avantage
+financier publié robuste (+3,5 % sur 56 435 paris, Kaunitz et al.) vient de **l'écart entre
+une cote et le consensus**, pas d'un modèle plus complexe.
+
+Donc, pour MISA-TV, un « résultat très fiable » se formule ainsi :
+
+> **Une probabilité calibrée, dérivée d'une loi jointe cohérente, ancrée sur le marché,
+> dont on connaît l'historique de réussite mesuré, l'incertitude, et qu'on refuse de
+> présenter comme une certitude.**
+
+Fiabilité ≠ exactitude ≠ rentabilité. L'interface doit afficher les trois registres
+séparément : probabilité, taux historique mesuré, et valeur/espérance — avec l'avertissement
+« Probabilités, pas certitudes. 18+. Jouez avec modération. »
+
+## 5. Ce qu'il ne faut **pas** agencer
+
+- empiler les modèles « parce qu'ils sont savants » : chaque brique non prouvée ajoute du
+  bruit et de la variance d'estimation ;
+- moyenne arithmétique de probabilités issues de sources corrélées ;
+- recalibrer sur les saisons de test (fuite) ;
+- laisser un expert sans CLV significatif modifier la matrice ;
+- multiplier `p(1)` par `p(plus de 1,5 buts dom)` sur le même match ;
+- mettre une brique quantique en production avant un benchmark avec IC ;
+- annoncer 90–98 % de réussite : sur le 1X2, c'est un signal de fuite de données.
+
+## 6. Extensions à évaluer (pas encore intégrées)
+
+| Extension | Principe | Condition d'entrée |
+|---|---|---|
+| QUBO + recuit simulé | sélection combinatoire de variables | battre la sélection actuelle en log-loss hors échantillon |
+| État-espace bayésien / score-driven | forces d'attaque qui évoluent (marche aléatoire) | gain RPS prouvé par bootstrap |
+| Copule / Weibull bivarié / Skellam | dépendance plus souple des scores | gain prouvé sur 12 895 matchs (déjà testé : non) |
+| Processus de Hawkes | intensité des buts en direct | cotes en direct + données événementielles |
+| Homologie persistante / GNN | topologie des réseaux de passes | données événementielles sous licence |
+| Prédiction conforme | intervalles de couverture garantie | calibration des intervalles sur saisons jamais vues |
+
+Protocole commun : même découpage train/test, RPS + log-loss + Brier contre marché avant
+clôture, IC bootstrap, CLV, graines fixées, et `web/tests/parite.py` inchangé.

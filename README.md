@@ -14,6 +14,10 @@ Moteur de pronostic de matchs de football fondé sur la recherche (voir `docs/re
 5. **Décision** : valeur attendue avec la meilleure cote, corrigée selon le délai avant le match ;
    mise par Kelly fractionnaire plafonné.
 
+Les principes, les bases mathématiques et l'agencement en couches de ces briques (marge,
+Dixon-Coles, Elo, pool logarithmique, raking, jumeau numérique, calibration, décision,
+validation) sont détaillés dans `docs/recherche/07_principes_et_agencement_misa_tv.md`.
+
 ## Structure
 
 | Fichier | Rôle |
