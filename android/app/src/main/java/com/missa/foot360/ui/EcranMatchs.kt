@@ -19,6 +19,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -58,7 +64,16 @@ fun EcranMatchs(etat: EtatApp, vm: AppViewModel, ouvrir: (String) -> Unit) {
         dates.firstOrNull { it >= aujourdhui } ?: dates.maxByOrNull { d -> tous.count { it == d } }
     }
     var date by remember(dates) { mutableStateOf(parDefaut) }
+    var recherche by remember { mutableStateOf("") }
+    var hauteConfiance by remember { mutableStateOf(false) }
     val replies = remember { mutableStateMapOf<String, Boolean>() }
+    val q = recherche.trim().lowercase()
+    // Filtre commun : date (ignorée pendant une recherche), texte, mode haute confiance
+    fun garder(champ: String, m: Match) =
+        (q.isNotEmpty() || date == null || m.date == date) &&
+        (q.isEmpty() || "${m.domicile} ${m.exterieur} $champ".lowercase().contains(q)) &&
+        (!hauteConfiance || m.selection_haute_confiance != null)
+    val nbFiables = etat.pronostics.championnats.sumOf { c -> c.matchs.count { garder(c.nom, it) } }
 
     PullToRefreshBox(isRefreshing = etat.actualisation, onRefresh = { vm.actualiser() }) {
     LazyColumn(contentPadding = PaddingValues(bottom = 90.dp)) {
@@ -76,16 +91,37 @@ fun EcranMatchs(etat: EtatApp, vm: AppViewModel, ouvrir: (String) -> Unit) {
                 color = Or, fontSize = 12.sp, modifier = Modifier.padding(12.dp))
         }
         item {
-            LazyRow(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+            OutlinedTextField(recherche, { recherche = it }, singleLine = true,
+                placeholder = { Text("Équipe ou championnat…", fontSize = 13.sp) },
+                leadingIcon = { Icon(Icons.Default.Search, null) },
+                trailingIcon = { if (recherche.isNotEmpty()) IconButton(onClick = { recherche = "" }) { Icon(Icons.Default.Close, "Effacer") } },
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 6.dp))
+        }
+        if (q.isEmpty()) item {
+            LazyRow(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                item { FilterChip(selected = date == null, onClick = { date = null }, label = { Text("Toutes les dates") }) }
                 items(dates) { d ->
-                    FilterChip(selected = d == date, onClick = { date = d },
-                        label = { Text(d.split("-").reversed().joinToString("/")) })
+                    FilterChip(selected = d == date, onClick = { date = d }, label = { Text(jourLisible(d)) })
                 }
             }
         }
+        item {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Mode haute confiance", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Text(if (hauteConfiance) "$nbFiables match(s) avec une sélection historiquement fiable"
+                         else "N'afficher que les matchs avec une sélection très fiable", fontSize = 11.sp, color = Discret)
+                }
+                Switch(checked = hauteConfiance, onCheckedChange = { hauteConfiance = it })
+            }
+        }
+        if (q.isNotEmpty() && nbFiables == 0) item {
+            Text("Aucun match ne correspond à « $recherche ».", fontSize = 13.sp, color = Discret, modifier = Modifier.padding(16.dp))
+        }
         etat.pronostics.championnats.forEach { champ ->
-            val matchs = champ.matchs.filter { it.date == date }
+            val matchs = champ.matchs.filter { garder(champ.nom, it) }
             if (matchs.isEmpty()) return@forEach
             val replie = replies[champ.code] == true
             stickyHeader(key = champ.code) {
@@ -95,7 +131,7 @@ fun EcranMatchs(etat: EtatApp, vm: AppViewModel, ouvrir: (String) -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(champ.nom, fontWeight = FontWeight.Bold, color = Vert, modifier = Modifier.weight(1f))
-                    Text("${matchs.size} matchs", fontSize = 12.sp)
+                    Text("${matchs.size} match${if (matchs.size > 1) "s" else ""}", fontSize = 12.sp, color = Discret)
                     Icon(if (replie) Icons.Default.ExpandMore else Icons.Default.ExpandLess, null)
                 }
             }
@@ -106,6 +142,11 @@ fun EcranMatchs(etat: EtatApp, vm: AppViewModel, ouvrir: (String) -> Unit) {
     }
     }
 }
+
+/** « 2026-11-22 » -> « dim. 22 nov. » */
+fun jourLisible(iso: String): String = runCatching {
+    java.time.LocalDate.parse(iso).format(java.time.format.DateTimeFormatter.ofPattern("EEE d MMM", java.util.Locale.FRANCE))
+}.getOrDefault(iso)
 
 /** Options rapides proposées sur chaque carte (code du jumeau, libellé court). */
 private val OPTIONS_RAPIDES = listOf(
@@ -121,16 +162,13 @@ fun CarteMatch(m: Match, vm: AppViewModel, etat: EtatApp, ouvrir: () -> Unit) {
     val prono = m.pronostic_principal
     val pProno = vm.proba(m.id, "1X2:$prono") ?: m.marches[prono]?.proba
     val texteProno = when (prono) { "1" -> "Victoire ${m.domicile}"; "2" -> "Victoire ${m.exterieur}"; else -> "Match nul" }
-    Card(
-        Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp).clickable(onClick = ouvrir),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-    ) {
+    Carte(Modifier.padding(horizontal = 10.dp, vertical = 4.dp), onClick = ouvrir) {
         Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(m.heure, fontSize = 12.sp, color = Or, modifier = Modifier.width(42.dp))
                 Text("${m.domicile} – ${m.exterieur}", fontWeight = FontWeight.SemiBold, fontSize = 14.sp,
                     maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                if (m.selections_value.isNotEmpty()) Badge("VALUE", Vert)
+                if (m.selections_value.isNotEmpty()) Pastille("VALUE", Vert, taille = 10.sp)
             }
             // Pronostic du moteur, en clair
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -160,15 +198,16 @@ fun CarteMatch(m: Match, vm: AppViewModel, etat: EtatApp, ouvrir: () -> Unit) {
                 val sure = m.selection_haute_confiance
                 if (sure != null) {
                     val c = m.marches[sure]?.confiance
-                    Badge("★ ${m.marches[sure]?.libelle ?: sure} · réel ${pct(c?.taux_historique, 0)}", Or)
+                    Pastille("★ ${m.marches[sure]?.libelle ?: sure} · réel ${pct(c?.taux_historique, 0)}" +
+                        (c?.n_historique?.takeIf { it > 0 }?.let { " sur $it" } ?: ""), Or, taille = 10.sp)
                 }
                 if (m.pronostiqueurs.isNotEmpty()) {
                     Spacer(Modifier.width(6.dp))
-                    Badge("${m.pronostiqueurs.size} expert(s)", couleurs.surfaceVariant, couleurs.onSurface)
+                    Pastille("${m.pronostiqueurs.size} expert(s)", taille = 10.sp)
                 }
                 Spacer(Modifier.weight(1f))
                 Text("Tous les paris (${etat.pronostics.catalogue.sumOf { it.options.size }}) ›",
-                    fontSize = 11.sp, color = Or, modifier = Modifier.clickable(onClick = ouvrir))
+                    fontSize = 11.sp, color = Vert, fontWeight = FontWeight.SemiBold, modifier = Modifier.clickable(onClick = ouvrir))
             }
         }
     }

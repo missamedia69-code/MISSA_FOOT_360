@@ -17,6 +17,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material3.BadgedBox
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.dp
 import com.missa.foot360.ui.EcranAccueil
 import com.missa.foot360.ui.EcranStats
 import com.missa.foot360.ui.EcranProfil
@@ -73,6 +75,7 @@ import com.missa.foot360.ui.EcranMatchs
 import com.missa.foot360.ui.EcranReglages
 import com.missa.foot360.ui.MissaTheme
 import com.missa.foot360.ui.Vert
+import com.missa.foot360.ui.Discret
 
 class MainActivity : ComponentActivity() {
     private val vm: AppViewModel by viewModels()
@@ -116,10 +119,27 @@ fun Application(vm: AppViewModel) {
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snack) },
+        snackbarHost = {
+            SnackbarHost(snack) { d ->
+                androidx.compose.material3.Snackbar(
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                        .border(1.dp, com.missa.foot360.ui.Vert.copy(alpha = 0.35f), androidx.compose.foundation.shape.RoundedCornerShape(12.dp)),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                    containerColor = androidx.compose.ui.graphics.Color(0xFF12261A), contentColor = androidx.compose.ui.graphics.Color(0xFFEDF5EF),
+                ) { Text("✓  " + d.visuals.message, fontSize = 13.sp) }
+            }
+        },
         topBar = {
             TopAppBar(
-                title = { Text("MISSA FOOT 360", fontWeight = FontWeight.Bold, color = Vert) },
+                title = {
+                    Column {
+                        Text(androidx.compose.ui.text.buildAnnotatedString {
+                            append("MISSA FOOT ")
+                            pushStyle(androidx.compose.ui.text.SpanStyle(color = Vert)); append("360"); pop()
+                        }, fontWeight = FontWeight.Bold, fontSize = 19.sp, letterSpacing = 0.5.sp)
+                        Text("ANALYSE FOOTBALL INTELLIGENTE", fontSize = 9.sp, color = Discret, letterSpacing = 1.2.sp)
+                    }
+                },
                 navigationIcon = {
                     if (route != null && ONGLETS.none { it.first == route }) {
                         IconButton({ nav.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Retour") }

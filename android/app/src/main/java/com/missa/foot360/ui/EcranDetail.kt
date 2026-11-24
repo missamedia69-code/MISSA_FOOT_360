@@ -4,6 +4,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Arrangement
@@ -47,26 +52,37 @@ fun EcranDetail(m: Match?, etat: EtatApp, vm: AppViewModel) {
     if (m == null) { Text("Match introuvable", Modifier.padding(16.dp)); return }
     if (m.jumeau == null) { Text("Données détaillées indisponibles pour ce match.", Modifier.padding(16.dp)); return }
     val groupes = etat.pronostics.catalogue.map { it.groupe }.distinct()
-    val onglets = listOf("Aperçu", "Forme", "Face-à-face", "Compos & absences") + groupes
+    val onglets = listOf("Aperçu", "Forme", "Face-à-face", "Scores exacts", "Compos & absences") + groupes
+    val NB_ANALYSE = 5
     var onglet by remember { mutableIntStateOf(0) }
+    var filtreMarche by remember { mutableStateOf("") }
     var voirModulation by remember { mutableStateOf(false) }
     val mod = etat.modulations[m.id] ?: Modulation()
 
     LazyColumn(contentPadding = PaddingValues(bottom = 110.dp)) {
         item {
             Column(Modifier.padding(16.dp)) {
-                Text("${m.domicile} - ${m.exterieur}", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                Text("${m.date.split("-").reversed().joinToString("/")} à ${m.heure}", color = Or)
-                Spacer(Modifier.height(6.dp))
+                Surtitre("Analyse d'un match")
+                Text("${m.domicile} – ${m.exterieur}", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                val nomChamp = etat.pronostics.championnats.firstOrNull { c -> c.matchs.any { it.id == m.id } }?.nom ?: ""
+                Text("$nomChamp · ${jourLisible(m.date)} à ${m.heure}", color = Or, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(8.dp))
                 val j = vm.jumeau(m.id)
                 val bd = j?.let { (0 until it.matrice.size).sumOf { i -> i * it.matrice[i].sum() } }
                 val be = j?.let { (0 until it.matrice.size).sumOf { k -> k * it.matrice.sumOf { r -> r[k] } } }
-                Text("Buts attendus : ${cote(bd)} - ${cote(be)}  ·  Corners : ${m.corners_attendus.joinToString(" - ") { cote(it) }}  ·  Cartons : ${m.cartons_attendus.joinToString(" - ") { cote(it) }}", fontSize = 13.sp)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    PuceInfo("Buts attendus", "${cote(bd)} – ${cote(be)}")
+                    PuceInfo("Score probable", m.score_probable)
+                    if (m.corners_attendus.size == 2) PuceInfo("Corners", m.corners_attendus.joinToString(" – ") { cote(it) })
+                    if (m.cartons_attendus.size == 2) PuceInfo("Cartons", m.cartons_attendus.joinToString(" – ") { cote(it) })
+                    if (m.methode.isNotEmpty()) PuceInfo("Méthode", m.methode)
+                }
+                Spacer(Modifier.height(6.dp))
                 Text(if (etat.unParMatch)
-                    "Touchez une option pour l'ajouter au ticket (une par match ; plusieurs événements : « Combinés officiels »)."
+                    "Touchez un pari pour l'ajouter au ticket (un par match ; plusieurs événements : onglet « Combinés officiels »)."
                 else "Mode analyse libre : plusieurs options d'un même match = probabilité conjointe exacte " +
                     "(non jouable tel quel chez un bookmaker).",
-                    fontSize = 12.sp, color = if (etat.unParMatch) Vert else Or)
+                    fontSize = 11.sp, color = if (etat.unParMatch) Discret else Or)
                 TextButton(onClick = { voirModulation = !voirModulation }) {
                     Text(if (mod.neutre) "⚙ Moduler le match (absences, forme, arbitre…)" else "⚙ Modulation active — modifier")
                 }
@@ -82,29 +98,64 @@ fun EcranDetail(m: Match?, etat: EtatApp, vm: AppViewModel) {
             0 -> item { OngletApercu(m, etat, vm) }
             1 -> item { OngletForme(m) }
             2 -> item { OngletFaceAFace(m) }
-            3 -> item { OngletCompos() }
+            3 -> item { OngletScores(m, etat, vm) }
+            4 -> item { OngletCompos() }
         }
-        val groupe = if (onglet >= 4) onglets[onglet] else null
-        items(etat.pronostics.catalogue.filter { it.groupe == groupe }) { gm ->
-            Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                Text(gm.titre, fontWeight = FontWeight.Bold, color = Vert)
-                HorizontalDivider(Modifier.padding(vertical = 4.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    gm.options.forEach { o ->
-                        val p = vm.proba(m.id, o.code)
-                        val sel = etat.combi.any { it.matchId == m.id && it.code == o.code }
-                        val hist = p?.let { tauxHistorique(etat.pronostics.fiabilite, familleFiabilite(o.code), it) }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            BoutonSelection(o.libelle, p, sel, Modifier.width(98.dp)) {
-                                vm.basculer(m, o.code, "${gm.titre} : ${o.libelle}")
-                            }
-                            Text("cote juste ${cote(p?.let { if (it > 0) 1 / it else null })}", fontSize = 10.sp)
-                            if (hist != null && hist.n >= 100 && (p ?: 0.0) >= 0.5)
-                                Text("réel ${pct(hist.reel, 0)}", fontSize = 10.sp, color = Or)
+        val groupe = if (onglet >= NB_ANALYSE) onglets[onglet] else null
+        if (groupe != null) item {
+            OutlinedTextField(filtreMarche, { filtreMarche = it }, singleLine = true,
+                placeholder = { Text("Chercher un pari dans les ${etat.pronostics.catalogue.sumOf { it.options.size }} marchés…", fontSize = 13.sp) },
+                leadingIcon = { Icon(Icons.Default.Search, null) },
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 10.dp))
+        }
+        val f = filtreMarche.trim().lowercase()
+        val blocs = etat.pronostics.catalogue.mapNotNull { gm ->
+            if (groupe == null) return@mapNotNull null
+            if (f.isEmpty()) gm.takeIf { it.groupe == groupe }
+            else gm.copy(options = gm.options.filter { "${gm.titre} ${it.libelle}".lowercase().contains(f) }).takeIf { it.options.isNotEmpty() }
+        }
+        items(blocs) { gm ->
+            Carte(Modifier.padding(horizontal = 12.dp, vertical = 5.dp)) {
+                Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Text(gm.titre, fontWeight = FontWeight.Bold, color = Vert, modifier = Modifier.weight(1f), fontSize = 14.sp)
+                    Text("${gm.options.size} options", fontSize = 10.sp, color = Discret)
+                }
+                Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp)) {
+                    listOf("SÉLECTION" to 1f, "PROBA" to .5f, "COTE JUSTE" to .5f, "RÉEL" to .4f).forEach { (t, w) ->
+                        Text(t, fontSize = 9.sp, color = Discret, letterSpacing = 0.8.sp, modifier = Modifier.weight(w),
+                            textAlign = if (w == 1f) androidx.compose.ui.text.style.TextAlign.Start else androidx.compose.ui.text.style.TextAlign.End)
+                    }
+                    Spacer(Modifier.width(34.dp))
+                }
+                gm.options.forEach { o ->
+                    val p = vm.proba(m.id, o.code)
+                    val sel = etat.combi.any { it.matchId == m.id && it.code == o.code }
+                    val hist = p?.let { tauxHistorique(etat.pronostics.fiabilite, familleFiabilite(o.code), it) }
+                    HorizontalDivider(color = Bord)
+                    Row(Modifier.fillMaxWidth().background(if (sel) VertFonce else Color.Transparent)
+                        .clickable { vm.basculer(m, o.code, "${gm.titre} : ${o.libelle}") }
+                        .padding(horizontal = 12.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(o.libelle, fontSize = 13.sp, modifier = Modifier.weight(1f),
+                            fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal)
+                        PourcentageAnime(p, Modifier.weight(.5f), dec = 1, taille = 13.sp, couleur = couleurProba(p ?: 0.0),
+                            alignement = androidx.compose.ui.text.style.TextAlign.End)
+                        Text(cote(p?.let { if (it > 0) 1 / it else null }), fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(.5f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                        Text(if (hist != null && hist.n >= 100) pct(hist.reel, 0) else "—", fontSize = 12.sp, color = Discret,
+                            modifier = Modifier.weight(.4f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                        Box(Modifier.padding(start = 8.dp).size(26.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(7.dp))
+                            .background(if (sel) Vert else VertFonce), contentAlignment = Alignment.Center) {
+                            Text(if (sel) "✓" else "+", color = if (sel) Color.Black else Vert, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
+                Spacer(Modifier.height(4.dp))
             }
+        }
+        if (groupe != null && blocs.isEmpty()) item {
+            Text("Aucun pari ne correspond à « $filtreMarche ».", fontSize = 13.sp, color = Discret, modifier = Modifier.padding(16.dp))
         }
         item {
             Column(Modifier.padding(16.dp)) {
@@ -114,8 +165,9 @@ fun EcranDetail(m: Match?, etat: EtatApp, vm: AppViewModel) {
                     Text("${a.pronostiqueur} : ${a.selection} @ ${cote(a.cote)} — ${a.statut} (effet ${signe(a.ajustement)})", fontSize = 12.sp)
                 }
                 Spacer(Modifier.height(8.dp))
-                Text("« réel » = part des sélections de ce type et de ce niveau de probabilité qui ont réellement " +
-                    "gagné sur les saisons de test (jamais vues par le moteur).", fontSize = 11.sp)
+                Text("« Réel » = part des sélections de ce type et de ce niveau de probabilité qui ont réellement " +
+                    "gagné sur les saisons de test (jamais vues par le moteur). « Cote juste » = cote sans marge du bookmaker : " +
+                    "une cote proposée plus haute est favorable.", fontSize = 11.sp, color = Discret)
             }
         }
     }
@@ -254,6 +306,56 @@ private fun OngletFaceAFace(m: Match) {
         }
         if (c.isNotEmpty()) Text("Les confrontations directes sont peu nombreuses : le moteur leur donne peu de poids, " +
             "les tendances récentes globales sont plus fiables.", fontSize = 11.sp)
+    }
+}
+
+/** Scores exacts : les plus probables et la grille complète (domicile en lignes, extérieur en colonnes). */
+@Composable
+private fun OngletScores(m: Match, etat: EtatApp, vm: AppViewModel) {
+    val mat = vm.jumeau(m.id)?.matrice ?: return
+    val n = minOf(mat.size, 6)
+    val tous = mat.indices.flatMap { i -> mat[i].indices.map { k -> Triple(i, k, mat[i][k]) } }.sortedByDescending { it.third }
+    val max = tous.firstOrNull()?.third ?: 1.0
+    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Scores les plus probables", fontWeight = FontWeight.Bold, color = Vert)
+        tous.take(8).forEach { (i, k, p) ->
+            val code = "CS:$i-$k"
+            val existe = etat.pronostics.catalogue.any { g -> g.options.any { it.code == code } }
+            val sel = etat.combi.any { it.matchId == m.id && it.code == code }
+            Row(Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
+                .background(if (sel) VertFonce else Color.Transparent)
+                .let { if (existe) it.clickable { vm.basculer(m, code, vm.libelleComplet(code)) } else it }
+                .padding(vertical = 3.dp, horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("$i – $k", fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(52.dp))
+                Box(Modifier.weight(1f).height(10.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(5.dp))
+                    .background(couleurs.surfaceVariant)) {
+                    Box(Modifier.fillMaxWidth((p / max).toFloat()).height(10.dp).background(Vert.copy(alpha = 0.85f)))
+                }
+                Text(pct(p, 1), fontSize = 12.sp, modifier = Modifier.width(58.dp), textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                Text("cote ${cote(1 / p)}", fontSize = 11.sp, color = Discret, modifier = Modifier.width(72.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End)
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text("Grille des scores (${m.domicile} en lignes, ${m.exterieur} en colonnes)", fontWeight = FontWeight.Bold, color = Vert, fontSize = 13.sp)
+        Row { Spacer(Modifier.width(26.dp)); (0 until n).forEach { k -> Text("$k", Modifier.weight(1f), fontSize = 11.sp, color = Discret,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center) } }
+        (0 until n).forEach { i ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("$i", Modifier.width(26.dp), fontSize = 11.sp, color = Discret)
+                (0 until n).forEach { k ->
+                    val p = mat[i][k]
+                    val a = (p / max).toFloat().coerceIn(0f, 1f)
+                    Box(Modifier.weight(1f).padding(1.dp).height(30.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(4.dp))
+                        .background(Vert.copy(alpha = 0.06f + 0.7f * a)), contentAlignment = Alignment.Center) {
+                        Text(if (p >= 0.005) "%.0f".format(p * 100) else "·", fontSize = 10.sp,
+                            color = if (a > 0.55f) Color.Black else couleurs.onSurface, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+        }
+        Text("Valeurs en %. Un score exact reste très incertain : même le plus probable dépasse rarement 15 %.",
+            fontSize = 11.sp, color = Discret)
     }
 }
 

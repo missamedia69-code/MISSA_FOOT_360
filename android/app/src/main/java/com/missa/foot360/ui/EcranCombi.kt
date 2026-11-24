@@ -45,15 +45,15 @@ fun BarreCombi(etat: EtatApp, ouvrir: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text((if (etat.unParMatch) "Ticket" else "Combiné libre") + " : ${etat.combi.size} sélection(s)", fontSize = 12.sp)
+            Text((if (etat.unParMatch) "Ticket" else "Combiné libre") + " : ${etat.combi.size} sélection(s)" +
+                (r.coteBookmaker?.let { c -> etat.mise?.let { m -> " · gain ${montant(m * c * (1 + etat.bonus))}" } } ?: ""),
+                fontSize = 12.sp, maxLines = 1)
             if (r.proba == 0.0) Text("Sélections incompatibles (probabilité nulle)",
                 fontWeight = FontWeight.Bold, color = Rouge)
             else Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Réussite ", fontWeight = FontWeight.Bold, color = Vert)
                 PourcentageAnime(r.proba, dec = 1, taille = 16.sp, couleur = couleurProba(r.proba))
-                Text("  ·  " + (r.coteBookmaker?.let { c -> "cote ${cote(c)}" +
-                    (etat.mise?.let { m -> " · gain ${montant(m * c * (1 + etat.bonus))}" } ?: "") }
-                    ?: "cote juste ${cote(r.coteJuste)}"), fontWeight = FontWeight.Bold, color = Vert,
+                Text("  ·  " + (r.coteBookmaker?.let { c -> "cote ${cote(c)}" } ?: "cote juste ${cote(r.coteJuste)}"), fontWeight = FontWeight.Bold, color = Vert,
                     maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             }
             if (r.proba > 0) BarreProba(r.proba, Modifier.padding(top = 4.dp), couleurProba(r.proba), 3.dp)
@@ -67,6 +67,7 @@ fun EcranCombi(etat: EtatApp, vm: AppViewModel, aller: (String) -> Unit = {}) {
     val r = etat.resultat
     LazyColumn(contentPadding = PaddingValues(16.dp)) {
         item {
+            Surtitre("Combiné & valeur")
             Text(if (etat.unParMatch) "Mon ticket" else "Mon combiné (analyse libre)", fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
         }
@@ -78,19 +79,20 @@ fun EcranCombi(etat: EtatApp, vm: AppViewModel, aller: (String) -> Unit = {}) {
         }
         // --- Résumé en haut : visible immédiatement, mis à jour en temps réel ---
         if (r != null) item {
-            Card(Modifier.fillMaxWidth()) {
+            Carte(accent = true) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    val (niv, coul) = risque(r.proba)
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Chances de réussite", Modifier.weight(1f), fontWeight = FontWeight.Bold)
-                        PourcentageAnime(r.proba, dec = 1, taille = 26.sp, couleur = couleurProba(r.proba))
+                        Column(Modifier.weight(1f)) {
+                            Text("Chances de réussite", fontWeight = FontWeight.Bold)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("${etat.combi.size} sélection(s)  ", fontSize = 12.sp, color = Discret)
+                                Pastille("Risque ${niv.lowercase()}", coul, taille = 10.sp)
+                            }
+                        }
+                        PourcentageAnime(r.proba, dec = 1, taille = 30.sp, couleur = couleurProba(r.proba))
                     }
                     BarreProba(r.proba, couleur = couleurProba(r.proba), hauteur = 6.dp)
-                    val (niv, coul) = risque(r.proba)
-                    Row {
-                        Text("Risque estimé : ", fontSize = 13.sp)
-                        Text(niv, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = coul)
-                        Text("  ·  ${etat.combi.size} sélection(s)", fontSize = 13.sp)
-                    }
                     Text("Sur 100 tickets identiques, environ ${"%.0f".format(r.proba * 100)} seraient gagnants.", fontSize = 12.sp)
                     Ligne("Cote totale du ticket", cote(r.coteBookmaker))
                     Ligne("Cote juste (équitable)", cote(r.coteJuste))
@@ -100,7 +102,7 @@ fun EcranCombi(etat: EtatApp, vm: AppViewModel, aller: (String) -> Unit = {}) {
                     var mise by remember { mutableStateOf(etat.mise?.let { "%.0f".format(it) } ?: "") }
                     OutlinedTextField(
                         value = mise, singleLine = true, modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Mise") },
+                        label = { Text("Mise") }, suffix = { if (devise.isNotEmpty()) Text(devise) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         onValueChange = { mise = it; vm.modifierMise(it.replace(',', '.').toDoubleOrNull()) },
                     )
@@ -117,19 +119,45 @@ fun EcranCombi(etat: EtatApp, vm: AppViewModel, aller: (String) -> Unit = {}) {
                     if (r.proba == 0.0) Text("Sélections incompatibles entre elles.", fontSize = 12.sp, color = Rouge)
                     if (r.valeurAttendue != null && r.valeurAttendue < 0) Text("Valeur négative : à long terme, " +
                         "ce type de ticket fait perdre de l'argent.", fontSize = 12.sp, color = Rouge)
+                    if (!r.memeMatch && etat.combi.size > 1) Text("D'un match à l'autre, les probabilités se multiplient ; " +
+                        "sur un même match, les sélections sont combinées avec leurs corrélations exactes.", fontSize = 11.sp, color = Discret)
                     if (r.memeMatch) Text("Analyse libre : plusieurs sélections sur un même match (corrélation prise " +
                         "en compte). Ce ticket ne serait PAS accepté tel quel par un bookmaker.", fontSize = 12.sp, color = Rouge)
                 }
             }
             Spacer(Modifier.height(8.dp))
-            Text("Sélections (${etat.combi.size} / ${com.missa.foot360.moteur.RegleTicket.MAX_SELECTIONS}) — cotes préremplies " +
-                "avec la meilleure cote du marché quand elle est connue : remplacez-les par celles de votre bookmaker.",
-                fontSize = 12.sp)
+            // Mise recommandée (Kelly fractionnaire) : nulle si le ticket a une valeur négative
+            r.coteBookmaker?.let { c ->
+                val k = kelly(r.proba, c)
+                Carte {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Surtitre("Mise recommandée (Kelly)")
+                        Text(if (k > 0) "Ce ticket a une valeur positive : misez au plus ${pct(k, 1)} de votre capital de jeu" + "."
+                             else "Valeur négative : le moteur ne recommande aucune mise sur ce ticket. Jouez-le seulement pour le plaisir, avec une petite somme.",
+                            fontSize = 12.sp, color = if (k > 0) Vert else Discret)
+                        Text("Calcul : quart de Kelly, plafonné à 5 % du capital. Ne poursuivez jamais une perte.", fontSize = 10.sp, color = Discret)
+                    }
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Sélections (${etat.combi.size})", fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                androidx.compose.material3.OutlinedButton(onClick = { vm.enregistrerTicket() },
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)) { Text("✓ Enregistrer", fontSize = 12.sp) }
+                Spacer(Modifier.width(6.dp))
+                androidx.compose.material3.OutlinedButton(onClick = { vm.vider() },
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)) { Text("Vider", fontSize = 12.sp, color = Rouge) }
+            }
+            Text("Cotes préremplies avec la meilleure cote du marché quand elle est connue : remplacez-les par celles de " +
+                "votre bookmaker (maximum ${com.missa.foot360.moteur.RegleTicket.MAX_SELECTIONS} sélections).",
+                fontSize = 11.sp, color = Discret)
         }
         itemsIndexed(etat.combi) { i, s ->
-            Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+            Carte(Modifier.padding(vertical = 4.dp)) {
                 Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
+                        val mm = etat.matchs[s.matchId]
+                        if (mm != null) Text("${jourMois(mm.date)} ${mm.heure}", fontSize = 10.sp, color = Or)
                         Text(s.libelleMatch, fontSize = 12.sp)
                         Text(s.libelle, fontWeight = FontWeight.Bold)
                         val p = vm.proba(s.matchId, s.code)
@@ -175,9 +203,9 @@ fun EcranCombi(etat: EtatApp, vm: AppViewModel, aller: (String) -> Unit = {}) {
                 }
             }
             Spacer(Modifier.height(10.dp))
-            Card(Modifier.fillMaxWidth()) {
+            Carte {
                 Column(Modifier.padding(12.dp)) {
-                    Text("Conseil du moteur", fontWeight = FontWeight.Bold, color = Vert)
+                    Surtitre("Conseil du moteur")
                     val faible = etat.combi.mapNotNull { j -> vm.proba(j.matchId, j.code)?.let { j to it } }.minByOrNull { it.second }
                     Text(buildString {
                         if (faible != null && etat.combi.size > 1)
@@ -188,13 +216,13 @@ fun EcranCombi(etat: EtatApp, vm: AppViewModel, aller: (String) -> Unit = {}) {
             }
             Spacer(Modifier.height(10.dp))
             Button(onClick = { vm.enregistrerTicket() }, modifier = Modifier.fillMaxWidth()) { Text("Enregistrer le ticket") }
-            Spacer(Modifier.height(6.dp))
-            Button(onClick = { vm.vider() }, modifier = Modifier.fillMaxWidth(),
-                colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = couleurs.surfaceVariant,
-                    contentColor = couleurs.onSurface)) { Text("Vider le ticket") }
         }
     }
 }
+
+/** Quart de Kelly plafonné à 5 % : part du capital à miser ; 0 si la valeur est négative. */
+fun kelly(p: Double, c: Double): Double =
+    if (c <= 1.0) 0.0 else (((p * c - 1) / (c - 1)) / 4).coerceIn(0.0, 0.05)
 
 @Composable
 private fun Ligne(titre: String, valeur: String, couleur: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface) {

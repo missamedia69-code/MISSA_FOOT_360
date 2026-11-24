@@ -27,6 +27,15 @@ class Depot(private val context: Context) {
         get() = prefs.getBoolean("plusieurs_par_match", false)
         set(v) = prefs.edit().putBoolean("plusieurs_par_match", v).apply()
 
+    /** Devise affichée (FCFA par défaut) et mise proposée à l'ouverture du ticket. */
+    var devise: String
+        get() = prefs.getString("devise", "FCFA") ?: "FCFA"
+        set(v) = prefs.edit().putString("devise", v).apply()
+
+    var miseParDefaut: Double?
+        get() = prefs.getFloat("mise_defaut", 0f).toDouble().takeIf { it > 0 }
+        set(v) = prefs.edit().putFloat("mise_defaut", (v ?: 0.0).toFloat()).apply()
+
     var majeurConfirme: Boolean
         get() = prefs.getBoolean("majeur", false)
         set(v) = prefs.edit().putBoolean("majeur", v).apply()

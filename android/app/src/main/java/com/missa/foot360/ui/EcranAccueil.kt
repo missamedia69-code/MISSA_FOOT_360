@@ -1,6 +1,8 @@
 package com.missa.foot360.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -51,53 +53,74 @@ fun EcranAccueil(etat: EtatApp, vm: AppViewModel, ouvrir: (String) -> Unit, alle
     LazyColumn(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 110.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
-            Text("ANALYSE FOOTBALL INTELLIGENTE", fontSize = 11.sp, color = Vert, fontWeight = FontWeight.Bold)
-            Text(if (etat.horsLigne) "Données de démonstration (hors ligne)"
-                 else "Analyses du ${dateGeneration(etat.pronostics.genere_le)}", fontSize = 12.sp)
-        }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Indicateur("${etat.matchs.size}", "Matchs analysés", Modifier.weight(1f))
-                Indicateur(pct(st?.reussite_globale, 0), "Réussite mesurée", Modifier.weight(1f))
-                Indicateur("${etat.matchs.values.count { it.selection_haute_confiance != null }}", "Sélections fiables", Modifier.weight(1f))
+            // Bandeau d'accueil : source des données, promesse, indicateurs mesurés
+            Carte(accent = true) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Pastille(if (etat.horsLigne) "● Données de démonstration (hors ligne)"
+                             else "● En ligne · calculé le ${dateGeneration(etat.pronostics.genere_le)}",
+                        if (etat.horsLigne) Or else Vert)
+                    Text("Analyse football intelligente", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    Text("Marché, Dixon-Coles et Elo combinés selon leur précision passée. Chaque match a son " +
+                        "jumeau numérique : ${etat.pronostics.catalogue.sumOf { it.options.size }} paris calculés " +
+                        "à partir d'une seule loi de probabilité.", fontSize = 12.sp, color = Discret)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Indicateur("${etat.matchs.size}", "Matchs analysés", Modifier.weight(1f))
+                        Indicateur(pct(st?.reussite_globale, 1), "Réussite mesurée", Modifier.weight(1f))
+                        Indicateur("${etat.matchs.values.count { it.selection_haute_confiance != null }}", "Sélections fiables", Modifier.weight(1f))
+                    }
+                    if (st != null) Text("Mesurée sur ${"%,d".format(st.pronostics_evalues).replace(',', ' ')} pronostics " +
+                        "de matchs jamais vus par le moteur ; ${pct(st.par_niveau.firstOrNull()?.reussite, 0)} pour la confiance très haute.",
+                        fontSize = 11.sp, color = Discret)
+                }
             }
-            if (st != null) Text("Réussite mesurée sur ${"%,d".format(st.pronostics_evalues).replace(',', ' ')} pronostics de matchs " +
-                "jamais vus par le moteur ; ${pct(st.par_niveau.firstOrNull()?.reussite, 0)} pour la confiance très haute.",
-                fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp))
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf("Aujourd'hui", "Demain", "Tous").forEach { f ->
-                    FilterChip(selected = filtre == f, onClick = { filtre = f }, label = { Text(f, fontSize = 12.sp) })
+                listOf("Aujourd'hui" to "Aujourd'hui · ${jourMois(aujourdhui)}", "Demain" to "Demain · ${jourMois(demain)}",
+                    "Tous" to "Tous").forEach { (f, lib) ->
+                    FilterChip(selected = filtre == f, onClick = { filtre = f }, label = { Text(lib, fontSize = 12.sp) })
                 }
             }
         }
         item { EnTete("Matchs recommandés", "Voir tout →") { aller("matchs") } }
-        if (recommandes.isEmpty()) item { Text("Aucune sélection très fiable pour cette période.", fontSize = 12.sp) }
+        if (recommandes.isEmpty()) item { Text("Aucune sélection très fiable pour cette période.", fontSize = 12.sp, color = Discret) }
         items(recommandes.take(8), key = { it.first.id }) { (m, code) -> CarteRecommandee(m, code, etat, vm, ouvrir) }
 
         val value = etat.pronostics.value.filter { v -> tous.any { it.id == v.match_id } }
         if (value.isNotEmpty()) {
-            item { EnTete("Meilleures opportunités (value)", "Voir tout →") { aller("conseils") } }
+            item { EnTete("Valeurs détectées", "Voir tout →") { aller("conseils") } }
             items(value.take(3), key = { "v" + it.match_id + it.selection }) { v ->
-                Card(Modifier.fillMaxWidth().clickable { ouvrir(v.match_id) }) {
+                val m = etat.matchs[v.match_id]
+                val code = codeValue(v.selection)
+                val dans = etat.combi.any { it.matchId == v.match_id && it.code == code }
+                Carte(onClick = { ouvrir(v.match_id) }) {
                     Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text("${v.domicile} – ${v.exterieur}", fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text("${v.libelle} · cote ${cote(v.meilleure_cote)}${v.bookmaker?.let { " ($it)" } ?: ""}", fontSize = 12.sp, color = Or)
+                            Text("${v.championnat.uppercase()} · ${m?.heure ?: ""}", fontSize = 10.sp, color = Or,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text("${v.domicile} – ${v.exterieur}", fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text("${v.libelle} · ${pct(v.proba, 1)} · cote ${cote(v.meilleure_cote)}", fontSize = 11.sp, color = Discret)
                         }
-                        Badge("+${"%.1f".format(v.valeur_brute * 100)} %", Vert)
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("+${"%.1f".format(v.valeur_brute * 100)} %", color = Vert, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                            v.bookmaker?.let { Text(it, fontSize = 10.sp, color = Discret, maxLines = 1) }
+                            if (m != null && code != null) BoutonAjouter(dans, Modifier.padding(top = 4.dp)) {
+                                vm.basculer(m, code, vm.libelleComplet(code), v.meilleure_cote)
+                            }
+                        }
                     }
                 }
             }
         }
         item {
-            Card(Modifier.fillMaxWidth().clickable { aller("assistant") },
-                colors = CardDefaults.cardColors(containerColor = VertFonce)) {
+            Carte(accent = true, onClick = { aller("assistant") }) {
                 Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("Générateur de tickets", fontWeight = FontWeight.Bold, color = Vert)
-                        Text("Choisissez le nombre de matchs et le risque : le moteur assemble le ticket le plus sûr.", fontSize = 12.sp)
+                        Surtitre("Assistant de combiné")
+                        Text("Générateur de tickets", fontWeight = FontWeight.Bold)
+                        Text("Choisissez le nombre de matchs et le risque : le moteur assemble le ticket le plus sûr.",
+                            fontSize = 12.sp, color = Discret)
                     }
                     Text("›", fontSize = 24.sp, color = Vert)
                 }
@@ -108,25 +131,36 @@ fun EcranAccueil(etat: EtatApp, vm: AppViewModel, ouvrir: (String) -> Unit, alle
                 EnTete("Bilan en direct", "Détails →") { aller("stats") }
                 Text(if (s.principal.regles == 0) "${s.principal.publies} pronostics publiés : les premiers résultats apparaîtront après les matchs."
                      else "Pronostics principaux : ${pct(s.principal.reussite, 0)} de réussite sur ${s.principal.regles} matchs joués · " +
-                        "haute confiance : ${pct(s.confiance.reussite, 0)} sur ${s.confiance.regles}.", fontSize = 12.sp)
+                        "haute confiance : ${pct(s.confiance.reussite, 0)} sur ${s.confiance.regles}.", fontSize = 12.sp, color = Discret)
             }
         }
     }
 }
 
+/** « 2026-11-22 » -> « 22/11 ». */
+fun jourMois(iso: String): String = if (iso.length < 10) iso else "${iso.substring(8, 10)}/${iso.substring(5, 7)}"
+
+/** Code du jumeau correspondant à une sélection « value » publiée (1, N, 2, plus_2.5, moins_2.5). */
+fun codeValue(sel: String): String? = when (sel) {
+    "1", "N", "2" -> "1X2:$sel"
+    "plus_2.5" -> "OU:2.5:plus"
+    "moins_2.5" -> "OU:2.5:moins"
+    else -> null
+}
+
 @Composable
 private fun Indicateur(valeur: String, titre: String, modifier: Modifier) {
-    Column(modifier.clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surface).padding(10.dp),
-        horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(valeur, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Vert)
-        Text(titre, fontSize = 10.sp, maxLines = 1)
+    Column(modifier.clip(RoundedCornerShape(12.dp)).background(Color(0x66060E09))
+        .border(1.dp, Bord, RoundedCornerShape(12.dp)).padding(horizontal = 10.dp, vertical = 8.dp)) {
+        Text(valeur, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Vert, maxLines = 1)
+        Text(titre, fontSize = 10.sp, maxLines = 1, color = Discret)
     }
 }
 
 @Composable
 fun EnTete(titre: String, action: String? = null, onAction: () -> Unit = {}) {
     Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(titre, fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.weight(1f))
+        Text(titre, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.weight(1f))
         if (action != null) Text(action, fontSize = 12.sp, color = Vert, modifier = Modifier.clickable(onClick = onAction))
     }
 }
@@ -137,22 +171,22 @@ private fun CarteRecommandee(m: Match, code: String, etat: EtatApp, vm: AppViewM
     val (r, couleur) = risque(p)
     val dans = etat.combi.any { it.matchId == m.id && it.code == code }
     val nomChamp = etat.pronostics.championnats.firstOrNull { c -> c.matchs.any { it.id == m.id } }?.nom ?: ""
-    Card(Modifier.fillMaxWidth().clickable { ouvrir(m.id) }) {
+    Carte(onClick = { ouvrir(m.id) }) {
         Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("${nomChamp.uppercase()} · ${m.heure}", fontSize = 10.sp, color = Or, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(m.domicile, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(m.exterieur, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(vm.libelleComplet(code).substringAfter(" : "), fontSize = 12.sp, color = Vert)
+                    Text(vm.libelleComplet(code).substringAfter(" : "), fontSize = 12.sp, color = Vert, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.width(6.dp))
-                    Text("Risque : $r", fontSize = 11.sp, color = couleur)
+                    Pastille("Risque ${r.lowercase()}", couleur, taille = 10.sp)
                 }
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 PourcentageAnime(p, taille = 22.sp, couleur = couleurProba(p))
                 Spacer(Modifier.height(4.dp))
-                BoutonSelection(if (dans) "Ajouté" else "+ Ajouter", null, dans, Modifier.width(84.dp)) {
+                BoutonAjouter(dans, Modifier.width(92.dp)) {
                     vm.basculer(m, code, vm.libelleComplet(code))
                 }
             }

@@ -1,6 +1,7 @@
 package com.missa.foot360.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -102,6 +103,21 @@ fun EcranReglages(vm: AppViewModel, etat: EtatApp) {
         Spacer(Modifier.height(8.dp))
         Text(if (etat.horsLigne) "État : hors ligne (données de démonstration)${etat.erreur?.let { " — $it" } ?: ""}"
             else "État : connecté — pronostics générés le ${etat.pronostics.genere_le}", fontSize = 12.sp)
+        Spacer(Modifier.height(20.dp))
+        Text("Devise et mise", fontWeight = FontWeight.Bold, color = Vert)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf("FCFA", "€", "$", "").forEach { d ->
+                androidx.compose.material3.FilterChip(selected = devise == d, onClick = { vm.changerDevise(d) },
+                    label = { Text(if (d.isEmpty()) "Sans unité" else d) })
+            }
+        }
+        var miseDef by remember { mutableStateOf(vm.depot.miseParDefaut?.let { "%.0f".format(it) } ?: "") }
+        OutlinedTextField(miseDef, {
+            miseDef = it; vm.changerMiseParDefaut(it.replace(',', '.').toDoubleOrNull()?.takeIf { v -> v > 0 })
+        }, label = { Text("Mise proposée par défaut dans le ticket") }, singleLine = true,
+            suffix = { if (devise.isNotEmpty()) Text(devise) },
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
+            modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(20.dp))
         Text("Règles du ticket", fontWeight = FontWeight.Bold, color = Vert)
         Row(verticalAlignment = Alignment.CenterVertically) {

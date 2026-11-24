@@ -31,10 +31,11 @@ fun EcranProfil(etat: EtatApp, vm: AppViewModel, aller: (String) -> Unit) {
     LazyColumn(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 110.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
+            Surtitre("Mon compte")
             Text("Mon profil", fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Row(Modifier.padding(top = 6.dp)) {
                 listOf("Réglages" to "reglages", "Experts" to "experts", "Conseils" to "conseils").forEach { (t, r) ->
-                    Card(Modifier.weight(1f).padding(end = 6.dp).clickable { aller(r) }) {
+                    Carte(Modifier.weight(1f).padding(end = 6.dp), onClick = { aller(r) }) {
                         Text(t, Modifier.padding(12.dp), fontWeight = FontWeight.SemiBold, color = Vert)
                     }
                 }
@@ -54,10 +55,10 @@ fun EcranProfil(etat: EtatApp, vm: AppViewModel, aller: (String) -> Unit) {
         }
         items(etat.tickets.zip(statuts), key = { it.first.id }) { (t, s) ->
             val couleur = when (s) { Statut.GAGNE -> Vert; Statut.PERDU -> Rouge; else -> Or }
-            Card(Modifier.fillMaxWidth()) {
+            Carte {
                 Column(Modifier.padding(10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Badge(s.libelle, couleur)
+                        Pastille(s.libelle, couleur, taille = 10.sp)
                         Text("  ${t.date.take(16).replace('T', ' ')} · ${t.jambes.size} sélection(s)", fontSize = 11.sp, modifier = Modifier.weight(1f))
                         IconButton(onClick = { vm.supprimerTicket(t.id) }) { Icon(Icons.Default.Delete, "Supprimer") }
                     }

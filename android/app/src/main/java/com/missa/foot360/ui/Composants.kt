@@ -1,6 +1,8 @@
 package com.missa.foot360.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.runtime.setValue
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -34,16 +36,66 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
 
-val Vert = Color(0xFF1DB954)
-val VertFonce = Color(0xFF0E3B24)
-val Or = Color(0xFFFFC94D)
-val Rouge = Color(0xFFE5534B)
+// Charte « vert néon sur charbon » (reprise et harmonisée avec la version web)
+val Vert = Color(0xFF2CE083)
+val VertFonce = Color(0xFF0B3A20)
+val Or = Color(0xFFF4BD45)
+val Rouge = Color(0xFFFF6F6F)
+val Orange = Color(0xFFF59A4A)
+val Discret = Color(0xFF9AB0A1)
+val Bord = Color(0x18FFFFFF)
 
 val couleurs = darkColorScheme(
-    primary = Vert, secondary = Or, background = Color(0xFF0B1410), surface = Color(0xFF13201A),
-    surfaceVariant = Color(0xFF1B2C23), onPrimary = Color.Black, onBackground = Color(0xFFE8F2EC),
-    onSurface = Color(0xFFE8F2EC), error = Rouge,
+    primary = Vert, onPrimary = Color(0xFF04140B), primaryContainer = VertFonce, onPrimaryContainer = Vert,
+    secondary = Or, secondaryContainer = VertFonce, onSecondaryContainer = Vert,
+    background = Color(0xFF060E09), onBackground = Color(0xFFEDF5EF),
+    surface = Color(0xFF0A1610), onSurface = Color(0xFFEDF5EF),
+    surfaceVariant = Color(0xFF1E2D24), onSurfaceVariant = Discret,
+    surfaceContainerLowest = Color(0xFF07110B), surfaceContainerLow = Color(0xFF0E1913),
+    surfaceContainer = Color(0xFF111D16), surfaceContainerHigh = Color(0xFF14211A),
+    surfaceContainerHighest = Color(0xFF17241C), surfaceTint = Vert,
+    outline = Color(0x29FFFFFF), outlineVariant = Bord, error = Rouge,
 )
+
+/** Devise affichée pour les mises et les gains (réglable dans Profil → Réglages). */
+var devise by androidx.compose.runtime.mutableStateOf("FCFA")
+
+/** Petit titre de section en capitales vertes (« TABLEAU DE BORD »). */
+@Composable
+fun Surtitre(texte: String, couleur: Color = Vert) {
+    Text(texte.uppercase(), fontSize = 10.sp, color = couleur, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp)
+}
+
+/** Pastille teintée : texte coloré sur fond de la même couleur, très atténué (risque, informations). */
+@Composable
+fun Pastille(texte: String, couleur: Color = Discret, modifier: Modifier = Modifier, taille: TextUnit = 11.sp) {
+    Text(texte, color = couleur, fontSize = taille, fontWeight = FontWeight.SemiBold, maxLines = 1,
+        modifier = modifier.clip(RoundedCornerShape(50)).background(couleur.copy(alpha = 0.13f))
+            .border(1.dp, couleur.copy(alpha = 0.28f), RoundedCornerShape(50))
+            .padding(horizontal = 8.dp, vertical = 3.dp))
+}
+
+/** Puce d'information « Libellé valeur » (en-tête de la fiche match). */
+@Composable
+fun PuceInfo(titre: String, valeur: String) {
+    Row(Modifier.clip(RoundedCornerShape(8.dp)).background(couleurs.surfaceContainerHighest)
+        .border(1.dp, Bord, RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) {
+        Text("$titre ", fontSize = 11.sp, color = Discret)
+        Text(valeur, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+/** Carte bordée, légèrement teintée de vert (style commun à tous les écrans). */
+@Composable
+fun Carte(modifier: Modifier = Modifier, accent: Boolean = false, onClick: (() -> Unit)? = null,
+          content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    val forme = RoundedCornerShape(14.dp)
+    val fond = if (accent) androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFF0F3121), Color(0xFF0D1A13)))
+               else androidx.compose.ui.graphics.SolidColor(couleurs.surfaceContainer)
+    Column(modifier.fillMaxWidth().clip(forme).background(fond)
+        .border(1.dp, if (accent) Vert.copy(alpha = 0.25f) else Bord, forme)
+        .let { if (onClick != null) it.clickable(onClick = onClick) else it }, content = content)
+}
 
 @Composable
 fun MissaTheme(content: @Composable () -> Unit) = MaterialTheme(colorScheme = couleurs, content = content)
@@ -53,7 +105,8 @@ fun pct(p: Double?, dec: Int = 1): String =
 
 fun cote(c: Double?): String = if (c == null) "—" else String.format(Locale.FRANCE, "%.2f", c)
 
-fun montant(v: Double): String = String.format(Locale.FRANCE, "%,.0f", v)
+fun montant(v: Double): String = String.format(Locale.FRANCE, "%,.0f", v).replace('\u202F', ' ').replace('\u00A0', ' ') +
+    (if (devise.isNotEmpty()) " $devise" else "")
 
 fun signe(v: Double?): String = if (v == null) "—" else String.format(Locale.FRANCE, "%+.1f %%", v * 100)
 
@@ -71,11 +124,12 @@ fun Badge(texte: String, fond: Color, couleurTexte: Color = Color.Black) {
 fun PourcentageAnime(
     p: Double?, modifier: Modifier = Modifier, dec: Int = 0, taille: TextUnit = 14.sp,
     couleur: Color = MaterialTheme.colorScheme.onSurface, gras: Boolean = true,
+    alignement: TextAlign? = null,
 ) {
-    if (p == null) { Text("—", modifier, fontSize = taille, color = couleur); return }
+    if (p == null) { Text("—", modifier, fontSize = taille, color = couleur, textAlign = alignement); return }
     val v by animateFloatAsState(p.toFloat(), tween(450, easing = FastOutSlowInEasing), label = "pct")
     Text(pct(v.toDouble(), dec), modifier, fontSize = taille, color = couleur,
-        fontWeight = if (gras) FontWeight.Bold else FontWeight.Normal)
+        fontWeight = if (gras) FontWeight.Bold else FontWeight.Normal, textAlign = alignement)
 }
 
 /** Couleur selon la probabilité : vert ≥ 50 %, or ≥ 20 %, rouge en dessous. */
@@ -103,6 +157,17 @@ fun BoutonSelection(
     }
 }
 
+/** Petit bouton « + Ajouter » / « ✓ Ajouté » (vert bordé, plein quand la sélection est au ticket). */
+@Composable
+fun BoutonAjouter(dans: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val fond by animateColorAsState(if (dans) Vert else VertFonce.copy(alpha = 0.6f), tween(250), label = "fondAjout")
+    Text(if (dans) "✓ Ajouté" else "+ Ajouter", color = if (dans) Color(0xFF04140B) else Vert, fontSize = 12.sp,
+        fontWeight = FontWeight.Bold, textAlign = TextAlign.Center,
+        modifier = modifier.clip(RoundedCornerShape(9.dp)).background(fond)
+            .border(1.dp, Vert.copy(alpha = 0.4f), RoundedCornerShape(9.dp)).clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 6.dp))
+}
+
 /** Barre de probabilité animée. */
 @Composable
 fun BarreProba(p: Double, modifier: Modifier = Modifier, couleur: Color = Vert, hauteur: Dp = 4.dp) {
@@ -117,7 +182,7 @@ fun BarreProba(p: Double, modifier: Modifier = Modifier, couleur: Color = Vert, 
 @Composable
 fun BandeauJeuResponsable(texte: String) {
     Row(
-        Modifier.fillMaxWidth().background(Color(0xFF2A1F0A)).padding(8.dp),
+        Modifier.fillMaxWidth().background(Color(0xFF1C1708)).padding(6.dp),
         horizontalArrangement = Arrangement.Center,
     ) {
         Text("⚠ $texte", color = Or, fontSize = 11.sp, textAlign = TextAlign.Center)

@@ -46,7 +46,7 @@ data class EtatApp(
 fun risque(p: Double): Pair<String, androidx.compose.ui.graphics.Color> = when {
     p >= 0.75 -> "Faible" to Vert
     p >= 0.55 -> "Modéré" to Or
-    p >= 0.35 -> "Élevé" to androidx.compose.ui.graphics.Color(0xFFFF8A3D)
+    p >= 0.35 -> "Élevé" to Orange
     else -> "Très élevé" to Rouge
 }
 
@@ -97,7 +97,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val cacheJumeaux = HashMap<Pair<String, Modulation>, Jumeau>()
 
     init {
-        _etat.update { it.copy(unParMatch = !depot.plusieursParMatch, tickets = depot.tickets) }
+        devise = depot.devise
+        _etat.update { it.copy(unParMatch = !depot.plusieursParMatch, tickets = depot.tickets, mise = depot.miseParDefaut) }
         charger()
     }
 
@@ -211,6 +212,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _etat.update { it.copy(tickets = liste) }
     }
 
+    fun changerDevise(d: String) { depot.devise = d; devise = d }
+
+    fun changerMiseParDefaut(m: Double?) {
+        depot.miseParDefaut = m
+        if (_etat.value.mise == null) _etat.update { it.copy(mise = m) }
+    }
+
     fun modifierMise(m: Double?) = _etat.update { it.copy(mise = m?.takeIf { v -> v > 0 }) }
 
     fun basculer(match: Match, code: String, libelle: String, cote: Double? = null) {
@@ -218,7 +226,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val r = RegleTicket.basculer(e.combi,
                 JambeCombine(match.id, code, "${match.domicile} - ${match.exterieur}", libelle,
                     cote ?: coteMarche(match, code)), e.unParMatch)
-            e.copy(combi = r.ticket, message = r.message)
+            val ajoute = r.ticket.any { it.matchId == match.id && it.code == code } &&
+                e.combi.none { it.matchId == match.id && it.code == code }
+            e.copy(combi = r.ticket, message = r.message ?: if (ajoute) "Ajouté au ticket : ${libelle.substringAfter(" : ")}" else null)
         }
         recalculer()
     }

@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
@@ -28,12 +30,13 @@ fun EcranStats(etat: EtatApp, aller: (String) -> Unit) {
     LazyColumn(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 110.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
+            Surtitre("Validation sur saisons jamais vues")
             Text("Performance du moteur", fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Text(st?.periode?.let { "Mesurée sur $it." } ?: "Statistiques indisponibles.", fontSize = 12.sp)
         }
         if (st != null) {
             item {
-                Card(Modifier.fillMaxWidth()) {
+                Carte(accent = true) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("Réussite globale", Modifier.weight(1f), fontWeight = FontWeight.Bold)
@@ -48,6 +51,20 @@ fun EcranStats(etat: EtatApp, aller: (String) -> Unit) {
                         Text("Probabilité annoncée en moyenne : ${pct(st.annonce_moyenne)} → réussite réelle : ${pct(st.reussite_globale)}. " +
                             "Quand les deux sont proches, les pourcentages de l'application sont fiables.", fontSize = 11.sp)
                     }
+                }
+            }
+            item {
+                EnTete("Courbe de fiabilité")
+                Text("Chaque point compare la probabilité annoncée (horizontal) à la réussite réelle (vertical). " +
+                    "Plus les points collent à la diagonale, plus les pourcentages de l'application sont fiables.",
+                    fontSize = 11.sp, color = Discret)
+                CourbeCalibration(
+                    (etat.pronostics.fiabilite["buts_match"] ?: emptyList()).filter { it.n >= 200 }.map { it.annonce to it.reel },
+                    st.combines.filter { it.n >= 100 }.map { it.annonce to it.reel },
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Text("● Paris simples", fontSize = 11.sp, color = Vert)
+                    Text("● Tickets combinés", fontSize = 11.sp, color = Or)
                 }
             }
             item { EnTete("Réussite par type de pari") }
@@ -105,6 +122,34 @@ fun EcranStats(etat: EtatApp, aller: (String) -> Unit) {
         item {
             Text("Une probabilité n'est jamais une garantie : même à 90 %, une sélection sur dix est perdante.",
                 fontSize = 11.sp, color = Or, modifier = Modifier.padding(top = 8.dp))
+        }
+    }
+}
+
+/** Courbe de calibration : diagonale idéale + points mesurés (deux séries). */
+@Composable
+private fun CourbeCalibration(simples: List<Pair<Double, Double>>, combines: List<Pair<Double, Double>>) {
+    val grille = Bord
+    androidx.compose.foundation.Canvas(Modifier.fillMaxWidth().height(220.dp).padding(vertical = 8.dp)) {
+        val g = 28f
+        val w = size.width - g; val h = size.height - g
+        fun pt(x: Double, y: Double) = androidx.compose.ui.geometry.Offset(g + (x * w).toFloat(), h - (y * h).toFloat())
+        for (i in 0..4) {
+            val v = i / 4.0
+            drawLine(grille, pt(0.0, v), pt(1.0, v), 1f)
+            drawLine(grille, pt(v, 0.0), pt(v, 1.0), 1f)
+        }
+        drawLine(Discret.copy(alpha = 0.6f), pt(0.0, 0.0), pt(1.0, 1.0), 2f,
+            pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 8f)))
+        listOf(simples to Vert, combines to Or).forEach { (pts, c) ->
+            val tries = pts.sortedBy { it.first }
+            tries.zipWithNext().forEach { (a, b) -> drawLine(c.copy(alpha = 0.7f), pt(a.first, a.second), pt(b.first, b.second), 3f) }
+            tries.forEach { drawCircle(c, 6f, pt(it.first, it.second)) }
+        }
+        val txt = android.graphics.Paint().apply { color = android.graphics.Color.rgb(154, 176, 161); textSize = 24f; isAntiAlias = true }
+        listOf(0, 50, 100).forEach { v ->
+            drawContext.canvas.nativeCanvas.drawText("$v", g + (v / 100f) * w - 12f, size.height - 2f, txt)
+            drawContext.canvas.nativeCanvas.drawText("$v", 0f, h - (v / 100f) * h + 8f, txt)
         }
     }
 }
