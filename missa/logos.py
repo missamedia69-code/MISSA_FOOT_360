@@ -42,6 +42,18 @@ EXTRA_NOMS = {
     "Vallecano": "Rayo Vallecano", "Espanol": "Espanyol", "M'gladbach": "Borussia Monchengladbach",
     "Ein Frankfurt": "Eintracht Frankfurt", "Paris SG": "Paris Saint-Germain", "St Etienne": "Saint-Etienne",
     "Man United": "Manchester United", "Man City": "Manchester City", "PSV Eindhoven": "PSV",
+    "Derby": "Derby County", "Lille": "Lille OSC", "Sp Gijon": "Sporting Gijon", "Oviedo": "Real Oviedo",
+    "Santander": "Racing Santander", "La Coruna": "Deportivo La Coruna", "Valladolid": "Real Valladolid",
+    "Peterboro": "Peterborough United", "Preston": "Preston North End", "Rotherham": "Rotherham United",
+    "Bristol Rvs": "Bristol Rovers", "Boston Utd": "Boston United", "Raith Rvs": "Raith Rovers",
+    "Queen of Sth": "Queen of the South", "For Sittard": "Fortuna Sittard", "Nijmegen": "NEC",
+    "Den Haag": "ADO Den Haag", "Buyuksehyr": "Istanbul Basaksehir", "Dresden": "Dynamo Dresden",
+    "Braunschweig": "Eintracht Braunschweig", "Doncaster": "Doncaster Rovers", "Lincoln": "Lincoln City",
+    "Oldham": "Oldham Athletic", "Sutton": "Sutton United", "Hamilton": "Hamilton Academical",
+    "Ayr": "Ayr United", "AEK": "AEK Athens", "Larisa": "AEL Larissa", "Levadeiakos": "Levadiakos",
+    "Nancy": "AS Nancy", "Metz": "FC Metz", "Reims": "Stade de Reims", "Annecy": "FC Annecy",
+    "Monaco": "AS Monaco", "Twente": "FC Twente", "Utrecht": "FC Utrecht", "Groningen": "FC Groningen",
+    "Swansea": "Swansea City", "Cardiff": "Cardiff City", "Celta B": "Celta Vigo B",
 }
 
 
@@ -65,10 +77,15 @@ def _chercher(nom: str) -> list[dict]:
         return (json.loads(r.read().decode("utf-8")) or {}).get("teams") or []
 
 
+# Pays acceptés en plus (clubs gallois en Angleterre, Monaco en France…)
+SYNONYMES = {"Netherlands": {"Netherlands", "The Netherlands", "Holland"}, "England": {"England", "Wales"},
+             "France": {"France", "Monaco"}, "USA": {"USA", "United States", "Canada"}}
+
+
 def _choisir(candidats: list[dict], nom: str, pays: str | None) -> str | None:
     bons = [t for t in candidats if t.get("strSport") == "Soccer" and t.get("strBadge")]
     if pays:
-        bons = [t for t in bons if (t.get("strCountry") or "") == pays]
+        bons = [t for t in bons if (t.get("strCountry") or "") in SYNONYMES.get(pays, {pays})]
     if not bons:
         return None
     n = _norm(nom)
@@ -95,7 +112,7 @@ def fusionner(*tables: dict | None) -> dict:
 
 
 def completer(equipes: dict[str, str | None], max_requetes: int = 40, pause: float = 2.1,
-              table: dict | None = None, sauvegarder: bool = True) -> dict:
+              table: dict | None = None, sauvegarder: bool = True, forcer: bool = False) -> dict:
     """equipes : nom -> code de championnat (pour le pays). Complète la table (data/logos.json par défaut)."""
     table = charger() if table is None else table
     aujourd_hui = dt.date.today()
@@ -104,14 +121,14 @@ def completer(equipes: dict[str, str | None], max_requetes: int = 40, pause: flo
         e = table.get(nom)
         if isinstance(e, dict) and e.get("url"):
             continue
-        if isinstance(e, dict) and e.get("essai"):
+        if isinstance(e, dict) and e.get("essai") and not forcer:
             if (aujourd_hui - dt.date.fromisoformat(e["essai"])).days < REESSAYER_APRES_JOURS:
                 continue
         if faites >= max_requetes:
             break
         pays = PAYS.get(code or "")
         url = None
-        for essai in dict.fromkeys([EXTRA_NOMS.get(nom), INVERSE.get(nom), nom]):
+        for essai in dict.fromkeys([EXTRA_NOMS.get(nom), INVERSE.get(nom), nom, f"{nom} FC", f"FC {nom}"]):
             if not essai or faites >= max_requetes:
                 continue
             try:
