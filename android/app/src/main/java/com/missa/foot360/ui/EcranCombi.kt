@@ -145,6 +145,10 @@ fun EcranCombi(etat: EtatApp, vm: AppViewModel, aller: (String) -> Unit = {}) {
                 androidx.compose.material3.OutlinedButton(onClick = { vm.enregistrerTicket() },
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)) { Text("✓ Enregistrer", fontSize = 12.sp) }
                 Spacer(Modifier.width(6.dp))
+                val ctx = androidx.compose.ui.platform.LocalContext.current
+                androidx.compose.material3.OutlinedButton(onClick = { partager(ctx, vm.texteTicket()) },
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)) { Text("Partager", fontSize = 12.sp) }
+                Spacer(Modifier.width(6.dp))
                 androidx.compose.material3.OutlinedButton(onClick = { vm.vider() },
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)) { Text("Vider", fontSize = 12.sp, color = Rouge) }
             }
@@ -153,10 +157,17 @@ fun EcranCombi(etat: EtatApp, vm: AppViewModel, aller: (String) -> Unit = {}) {
                 fontSize = 11.sp, color = Discret)
         }
         itemsIndexed(etat.combi) { i, s ->
-            Carte(Modifier.padding(vertical = 4.dp)) {
+            Carte(Modifier.padding(vertical = 4.dp).apparition(i)) {
                 Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    val mm = etat.matchs[s.matchId]
+                    if (mm != null) {
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            LogoEquipe(mm.domicile, etat.pronostics.logos[mm.domicile], 20.dp)
+                            LogoEquipe(mm.exterieur, etat.pronostics.logos[mm.exterieur], 20.dp)
+                        }
+                        Spacer(Modifier.width(8.dp))
+                    }
                     Column(Modifier.weight(1f)) {
-                        val mm = etat.matchs[s.matchId]
                         if (mm != null) Text("${jourMois(mm.date)} ${mm.heure}", fontSize = 10.sp, color = Or)
                         Text(s.libelleMatch, fontSize = 12.sp)
                         Text(s.libelle, fontWeight = FontWeight.Bold)

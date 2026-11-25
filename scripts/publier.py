@@ -24,7 +24,7 @@ import pandas as pd
 RACINE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RACINE))
 
-from missa import donnees, journal, odds_api  # noqa: E402
+from missa import logos, donnees, journal, odds_api  # noqa: E402
 from missa.pipeline import Moteur, identifiant, saisons_precedentes  # noqa: E402
 from missa.stockage import Stockage  # noqa: E402
 
@@ -194,6 +194,64 @@ def suivre_value(res: dict, sortie: Path) -> dict:
     return journal.resume(jr) | {"ajoutes": ajoutes, "clotures": clotures}
 
 
+def ajouter_extras(res: dict, sortie: Path) -> None:
+    """Logos des équipes, contacts et annonces, tickets spéciaux publiés par l'éditeur."""
+    # Logos : table du dépôt + table de la publication précédente, complétée petit à petit
+    equipes = {}
+    for c in res["championnats"]:
+        for m in c["matchs"]:
+            equipes.setdefault(m["domicile"], c["code"])
+            equipes.setdefault(m["exterieur"], c["code"])
+    try:
+        table = logos.fusionner(logos.charger(), charger_precedent("logos.json"))
+        table = logos.completer(equipes, max_requetes=int(os.environ.get("LOGOS_MAX_REQUETES", "40")),
+                                table=table, sauvegarder=False)
+        (sortie / "logos.json").write_text(json.dumps(table, ensure_ascii=False), encoding="utf-8")
+        res["logos"] = logos.adresses(table, equipes)
+    except Exception as e:
+        print(f"[publier] logos indisponibles : {e}")
+
+    config = RACINE / "data" / "config_app.json"
+    if config.exists():
+        res["config"] = json.loads(config.read_text(encoding="utf-8"))
+    res["tickets_speciaux"] = tickets_speciaux(res)
+
+
+def tickets_speciaux(res: dict) -> list[dict]:
+    """data/tickets_speciaux.json : chaque sélection désigne un match par son identifiant ou par
+    « domicile » / « exterieur » (noms comme dans l'application). Les sélections dont le match
+    n'est pas publié sont gardées (affichées sans probabilité) ; un ticket expire après 3 jours."""
+    f = RACINE / "data" / "tickets_speciaux.json"
+    if not f.exists():
+        return []
+    try:
+        brut = json.loads(f.read_text(encoding="utf-8"))
+    except ValueError as e:
+        print(f"[publier] tickets_speciaux.json invalide : {e}")
+        return []
+    matchs = [m for c in res["championnats"] for m in c["matchs"]]
+    norme = lambda s: odds_api._norm(s or "")
+    limite = (datetime.now(timezone.utc) - pd.Timedelta(days=3)).date().isoformat()
+    out = []
+    for t in brut if isinstance(brut, list) else []:
+        if str(t.get("publie_le", "9999"))[:10] < limite:
+            continue
+        jambes = []
+        for j in t.get("selections", []):
+            mid = j.get("match_id")
+            if not mid:
+                d, e = norme(j.get("domicile")), norme(j.get("exterieur"))
+                trouve = next((m for m in matchs if norme(m["domicile"]) == d and norme(m["exterieur"]) == e), None) \
+                    or next((m for m in matchs if d and e and d in norme(m["domicile"]) and e in norme(m["exterieur"])), None)
+                mid = trouve["id"] if trouve else None
+            jambes.append({"match_id": mid, "code": j.get("code", ""), "domicile": j.get("domicile", ""),
+                           "exterieur": j.get("exterieur", ""), "libelle": j.get("libelle", ""), "cote": j.get("cote")})
+        out.append({"id": str(t.get("id") or t.get("titre")), "titre": t.get("titre", "Ticket spécial"),
+                    "description": t.get("description", ""), "auteur": t.get("auteur", ""),
+                    "publie_le": t.get("publie_le", ""), "selections": jambes})
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--sortie", default=str(RACINE / "publication"))
@@ -224,6 +282,7 @@ def main():
     if stats.exists():
         res["stats_moteur"] = json.loads(stats.read_text(encoding="utf-8"))
     nb = sum(len(c["matchs"]) for c in res["championnats"])
+    ajouter_extras(res, sortie)
 
     (sortie / "pronostics.json").write_text(json.dumps(res, ensure_ascii=False), encoding="utf-8")
     (sortie / "pronostiqueurs.json").write_text(json.dumps(stockage.classement(), ensure_ascii=False),

@@ -1,0 +1,13 @@
+[
+  {
+    "id": "exemple-2026-11-20",
+    "titre": "Exemple : ticket du jour",
+    "description": "Modèle à copier. Ce ticket a expiré (publié il y a plus de 3 jours) : il n'apparaît pas dans l'application.",
+    "auteur": "MISSA FOOT 360",
+    "publie_le": "2026-11-20",
+    "selections": [
+      {"domicile": "Real Madrid", "exterieur": "Alaves", "code": "DC:1N", "libelle": "Double chance 1N", "cote": 1.05},
+      {"domicile": "Arsenal", "exterieur": "Chelsea", "code": "OU:1.5:plus", "libelle": "Plus de 1,5 buts", "cote": 1.30}
+    ]
+  }
+]

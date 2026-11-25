@@ -15,6 +15,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.layout.Box
+import kotlin.math.roundToInt
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -50,23 +53,32 @@ fun EcranAccueil(etat: EtatApp, vm: AppViewModel, ouvrir: (String) -> Unit, alle
         .sortedByDescending { (m, c) -> vm.proba(m.id, c) ?: 0.0 }
     val st = etat.pronostics.stats_moteur
 
+    if (etat.chargement) { ListeSquelette(); return }
     LazyColumn(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 110.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        etat.pronostics.config.annonce.takeIf { it.isNotBlank() }?.let { a ->
+            item { Carte(Modifier.apparition()) { Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("📣", fontSize = 18.sp); Spacer(Modifier.width(8.dp)); Text(a, fontSize = 13.sp, color = Or) } } }
+        }
         item {
             // Bandeau d'accueil : source des données, promesse, indicateurs mesurés
-            Carte(accent = true) {
+            Carte(Modifier.apparition(), accent = true) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Pastille(if (etat.horsLigne) "● Données de démonstration (hors ligne)"
-                             else "● En ligne · calculé le ${dateGeneration(etat.pronostics.genere_le)}",
-                        if (etat.horsLigne) Or else Vert)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        PointPulse(if (etat.horsLigne) Or else Vert)
+                        Spacer(Modifier.width(6.dp))
+                        Pastille(if (etat.horsLigne) "Données de démonstration (hors ligne)"
+                                 else "En ligne · calculé le ${dateGeneration(etat.pronostics.genere_le)}",
+                            if (etat.horsLigne) Or else Vert)
+                    }
                     Text("Analyse football intelligente", fontSize = 20.sp, fontWeight = FontWeight.Bold)
                     Text("Marché, Dixon-Coles et Elo combinés selon leur précision passée. Chaque match a son " +
                         "jumeau numérique : ${etat.pronostics.catalogue.sumOf { it.options.size }} paris calculés " +
                         "à partir d'une seule loi de probabilité.", fontSize = 12.sp, color = Discret)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Indicateur("${etat.matchs.size}", "Matchs analysés", Modifier.weight(1f))
-                        Indicateur(pct(st?.reussite_globale, 1), "Réussite mesurée", Modifier.weight(1f))
-                        Indicateur("${etat.matchs.values.count { it.selection_haute_confiance != null }}", "Sélections fiables", Modifier.weight(1f))
+                        Indicateur(etat.matchs.size, "", "Matchs analysés", Modifier.weight(1f))
+                        Indicateur(((st?.reussite_globale ?: 0.0) * 100).roundToInt(), " %", "Réussite mesurée", Modifier.weight(1f))
+                        Indicateur(etat.matchs.values.count { it.selection_haute_confiance != null }, "", "Sélections fiables", Modifier.weight(1f))
                     }
                     if (st != null) Text("Mesurée sur ${"%,d".format(st.pronostics_evalues).replace(',', ' ')} pronostics " +
                         "de matchs jamais vus par le moteur ; ${pct(st.par_niveau.firstOrNull()?.reussite, 0)} pour la confiance très haute.",
@@ -84,7 +96,13 @@ fun EcranAccueil(etat: EtatApp, vm: AppViewModel, ouvrir: (String) -> Unit, alle
         }
         item { EnTete("Matchs recommandés", "Voir tout →") { aller("matchs") } }
         if (recommandes.isEmpty()) item { Text("Aucune sélection très fiable pour cette période.", fontSize = 12.sp, color = Discret) }
-        items(recommandes.take(8), key = { it.first.id }) { (m, code) -> CarteRecommandee(m, code, etat, vm, ouvrir) }
+        itemsIndexed(recommandes.take(8), key = { _, it -> it.first.id }) { rang, (m, code) ->
+            Box(Modifier.apparition(rang)) { CarteRecommandee(m, code, etat, vm, ouvrir) }
+        }
+        if (etat.pronostics.tickets_speciaux.isNotEmpty()) {
+            item { EnTete("Tickets spéciaux", "Voir tout →") { aller("speciaux") } }
+            items(etat.pronostics.tickets_speciaux.take(2), key = { "ts" + it.id }) { t -> CarteTicketSpecial(t, etat, vm) }
+        }
 
         val value = etat.pronostics.value.filter { v -> tous.any { it.id == v.match_id } }
         if (value.isNotEmpty()) {
@@ -149,10 +167,10 @@ fun codeValue(sel: String): String? = when (sel) {
 }
 
 @Composable
-private fun Indicateur(valeur: String, titre: String, modifier: Modifier) {
+private fun Indicateur(valeur: Int, suffixe: String, titre: String, modifier: Modifier) {
     Column(modifier.clip(RoundedCornerShape(12.dp)).background(Color(0x66060E09))
         .border(1.dp, Bord, RoundedCornerShape(12.dp)).padding(horizontal = 10.dp, vertical = 8.dp)) {
-        Text(valeur, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Vert, maxLines = 1)
+        NombreAnime(valeur, suffixe)
         Text(titre, fontSize = 10.sp, maxLines = 1, color = Discret)
     }
 }
@@ -175,8 +193,13 @@ private fun CarteRecommandee(m: Match, code: String, etat: EtatApp, vm: AppViewM
         Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("${nomChamp.uppercase()} · ${m.heure}", fontSize = 10.sp, color = Or, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(m.domicile, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(m.exterieur, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                listOf(m.domicile, m.exterieur).forEach { eq ->
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 1.dp)) {
+                        LogoEquipe(eq, etat.pronostics.logos[eq], 20.dp)
+                        Spacer(Modifier.width(7.dp))
+                        Text(eq, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(vm.libelleComplet(code).substringAfter(" : "), fontSize = 12.sp, color = Vert, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.width(6.dp))

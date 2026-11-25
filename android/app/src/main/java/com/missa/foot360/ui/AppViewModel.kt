@@ -233,6 +233,43 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         recalculer()
     }
 
+    /** Sélections d'un ticket spécial dont le match est publié (les autres sont ignorées). */
+    fun jambesSpeciales(t: com.missa.foot360.data.TicketSpecial): List<JambeCombine> = t.selections.mapNotNull { s ->
+        val m = _etat.value.matchs[s.match_id ?: return@mapNotNull null] ?: return@mapNotNull null
+        JambeCombine(m.id, s.code, "${m.domicile} - ${m.exterieur}", s.libelle.ifBlank { libelleComplet(s.code) }, s.cote)
+    }
+
+    /** Probabilité du ticket spécial d'après le moteur (null si un match n'est plus publié). */
+    fun probaSpeciale(t: com.missa.foot360.data.TicketSpecial): Double? {
+        val j = jambesSpeciales(t)
+        if (j.isEmpty() || j.size < t.selections.size) return null
+        val jumeaux = j.map { it.matchId }.distinct().mapNotNull { id -> jumeau(id)?.let { id to it } }.toMap()
+        return runCatching { calculerCombine(j, jumeaux, 0.0).proba }.getOrNull()
+    }
+
+    fun copierSpecial(t: com.missa.foot360.data.TicketSpecial) = ajouterPlusieurs(jambesSpeciales(t))
+
+    /** Texte du ticket en cours, à partager (WhatsApp, SMS…). */
+    fun texteTicket(): String {
+        val e = _etat.value
+        val r = e.resultat
+        return buildString {
+            appendLine("🎟️ Mon ticket MISSA FOOT 360")
+            e.combi.forEach { j ->
+                append("• ${j.libelleMatch} : ${j.libelle}")
+                j.cote?.let { append(" @ ${cote(it)}") }
+                appendLine()
+            }
+            if (r != null) {
+                append("Chances estimées : ${pct(r.proba, 1)}")
+                r.coteBookmaker?.let { append(" · cote ${cote(it)}") }
+                appendLine()
+            }
+            e.pronostics.config.lien_telechargement.takeIf { it.isNotBlank() }?.let { appendLine("Application : $it") }
+            append("Probabilités, pas certitudes. 18+.")
+        }
+    }
+
     fun ajouterPlusieurs(jambes: List<JambeCombine>) {
         _etat.update { e ->
             val r = RegleTicket.ajouterPlusieurs(e.combi, jambes, e.unParMatch)

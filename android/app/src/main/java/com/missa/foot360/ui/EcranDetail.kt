@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.border
 import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.PrimaryScrollableTabRow
@@ -62,11 +64,28 @@ fun EcranDetail(m: Match?, etat: EtatApp, vm: AppViewModel) {
     LazyColumn(contentPadding = PaddingValues(bottom = 110.dp)) {
         item {
             Column(Modifier.padding(16.dp)) {
-                Surtitre("Analyse d'un match")
-                Text("${m.domicile} – ${m.exterieur}", fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 val nomChamp = etat.pronostics.championnats.firstOrNull { c -> c.matchs.any { it.id == m.id } }?.nom ?: ""
-                Text("$nomChamp · ${jourLisible(m.date)} à ${m.heure}", color = Or, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(8.dp))
+                Surtitre(nomChamp, Or)
+                Text("${jourLisible(m.date)} à ${m.heure}", color = Discret, fontSize = 12.sp)
+                Spacer(Modifier.height(10.dp))
+                // Face-à-face : logos des deux équipes
+                Row(Modifier.fillMaxWidth().apparition(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                        LogoEquipe(m.domicile, etat.pronostics.logos[m.domicile], 58.dp)
+                        Text(m.domicile, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 2,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(top = 6.dp))
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(m.heure, color = Or, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Text("VS", color = Discret, fontSize = 11.sp, letterSpacing = 2.sp)
+                    }
+                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                        LogoEquipe(m.exterieur, etat.pronostics.logos[m.exterieur], 58.dp)
+                        Text(m.exterieur, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 2,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(top = 6.dp))
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
                 val j = vm.jumeau(m.id)
                 val bd = j?.let { (0 until it.matrice.size).sumOf { i -> i * it.matrice[i].sum() } }
                 val be = j?.let { (0 until it.matrice.size).sumOf { k -> k * it.matrice.sumOf { r -> r[k] } } }
@@ -79,7 +98,7 @@ fun EcranDetail(m: Match?, etat: EtatApp, vm: AppViewModel) {
                 }
                 Spacer(Modifier.height(6.dp))
                 Text(if (etat.unParMatch)
-                    "Touchez un pari pour l'ajouter au ticket (un par match ; plusieurs événements : onglet « Combinés officiels »)."
+                    "➕ Touchez une case marquée « + » pour l'ajouter au ticket (un pari par match ; plusieurs événements : onglet « Combinés officiels »)."
                 else "Mode analyse libre : plusieurs options d'un même match = probabilité conjointe exacte " +
                     "(non jouable tel quel chez un bookmaker).",
                     fontSize = 11.sp, color = if (etat.unParMatch) Discret else Or)
@@ -94,12 +113,16 @@ fun EcranDetail(m: Match?, etat: EtatApp, vm: AppViewModel) {
                 onglets.forEachIndexed { i, g -> Tab(selected = onglet == i, onClick = { onglet = i }, text = { Text(g) }) }
             }
         }
-        when (onglet) {
-            0 -> item { OngletApercu(m, etat, vm) }
-            1 -> item { OngletForme(m) }
-            2 -> item { OngletFaceAFace(m) }
-            3 -> item { OngletScores(m, etat, vm) }
-            4 -> item { OngletCompos() }
+        if (onglet < NB_ANALYSE) item(key = "onglet$onglet") {
+            Box(Modifier.apparition()) {
+                when (onglet) {
+                    0 -> OngletApercu(m, etat, vm)
+                    1 -> OngletForme(m)
+                    2 -> OngletFaceAFace(m)
+                    3 -> OngletScores(m, etat, vm)
+                    else -> OngletCompos()
+                }
+            }
         }
         val groupe = if (onglet >= NB_ANALYSE) onglets[onglet] else null
         if (groupe != null) item {
@@ -115,8 +138,8 @@ fun EcranDetail(m: Match?, etat: EtatApp, vm: AppViewModel) {
             if (f.isEmpty()) gm.takeIf { it.groupe == groupe }
             else gm.copy(options = gm.options.filter { "${gm.titre} ${it.libelle}".lowercase().contains(f) }).takeIf { it.options.isNotEmpty() }
         }
-        items(blocs) { gm ->
-            Carte(Modifier.padding(horizontal = 12.dp, vertical = 5.dp)) {
+        itemsIndexed(blocs, key = { _, g -> "$groupe|$f|${g.titre}" }) { rang, gm ->
+            Carte(Modifier.padding(horizontal = 12.dp, vertical = 5.dp).apparition(rang)) {
                 Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 4.dp),
                     verticalAlignment = Alignment.CenterVertically) {
                     Text(gm.titre, fontWeight = FontWeight.Bold, color = Vert, modifier = Modifier.weight(1f), fontSize = 14.sp)
@@ -145,10 +168,8 @@ fun EcranDetail(m: Match?, etat: EtatApp, vm: AppViewModel) {
                             modifier = Modifier.weight(.5f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
                         Text(if (hist != null && hist.n >= 100) pct(hist.reel, 0) else "—", fontSize = 12.sp, color = Discret,
                             modifier = Modifier.weight(.4f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
-                        Box(Modifier.padding(start = 8.dp).size(26.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(7.dp))
-                            .background(if (sel) Vert else VertFonce), contentAlignment = Alignment.Center) {
-                            Text(if (sel) "✓" else "+", color = if (sel) Color.Black else Vert, fontWeight = FontWeight.Bold)
-                        }
+                        Spacer(Modifier.width(8.dp))
+                        SigneAjout(sel)
                     }
                 }
                 Spacer(Modifier.height(4.dp))
@@ -205,31 +226,38 @@ private fun Curseur(titre: String, valeur: Double, changer: (Double) -> Unit) {
 @Composable
 private fun OngletApercu(m: Match, etat: EtatApp, vm: AppViewModel) {
     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Probabilités des résultats", fontWeight = FontWeight.Bold, color = Vert)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Résultat du match", fontWeight = FontWeight.Bold, color = Vert, modifier = Modifier.weight(1f))
+            Text("touchez pour ajouter", fontSize = 10.sp, color = Discret)
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("1" to "Victoire ${m.domicile}", "N" to "Match nul", "2" to "Victoire ${m.exterieur}").forEach { (c, t) ->
+            listOf("1" to m.domicile, "N" to "Match nul", "2" to m.exterieur).forEach { (c, t) ->
                 val code = "1X2:$c"
-                val p = vm.proba(m.id, code)
-                Column(Modifier.weight(1f).clickable { vm.basculer(m, code, vm.libelleComplet(code)) },
-                    horizontalAlignment = Alignment.CenterHorizontally) {
-                    PourcentageAnime(p, taille = 24.sp, couleur = couleurProba(p ?: 0.0))
-                    Text(t, fontSize = 11.sp, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                }
+                TuileChoix(t, vm.proba(m.id, code), etat.combi.any { it.matchId == m.id && it.code == code },
+                    Modifier.weight(1f), sousTitre = if (c == "N") "N" else c) { vm.basculer(m, code, vm.libelleComplet(code)) }
             }
         }
-        Text("Marchés clés", fontWeight = FontWeight.Bold, color = Vert)
-        listOf("DC:1N", "DC:N2", "OU:1.5:plus", "OU:2.5:plus", "OU:3.5:moins", "BTTS:oui").forEach { code ->
+        Text("Paris clés", fontWeight = FontWeight.Bold, color = Vert, modifier = Modifier.padding(top = 6.dp))
+        listOf("DC:1N", "DC:N2", "DC:12", "OU:1.5:plus", "OU:2.5:plus", "OU:3.5:moins", "BTTS:oui", "BTTS:non").forEach { code ->
             val p = vm.proba(m.id, code) ?: return@forEach
             val (r, c) = risque(p)
             val sel = etat.combi.any { it.matchId == m.id && it.code == code }
-            Row(Modifier.fillMaxWidth().clickable { vm.basculer(m, code, vm.libelleComplet(code)) }.padding(vertical = 3.dp),
+            val fond by androidx.compose.animation.animateColorAsState(if (sel) VertFonce else couleurs.surfaceContainer, label = "cle")
+            Row(Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp)).background(fond)
+                .border(1.dp, if (sel) Vert.copy(alpha = 0.6f) else Bord, androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+                .clickable { vm.basculer(m, code, vm.libelleComplet(code)) }.padding(horizontal = 10.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically) {
-                Text((if (sel) "✓ " else "") + vm.libelleComplet(code).substringAfter(" : ").let {
-                    "${vm.libelleComplet(code).substringBefore(" : ")} : $it" }, fontSize = 13.sp, modifier = Modifier.weight(1f),
-                    maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                    fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal)
-                Text(r, fontSize = 11.sp, color = c, modifier = Modifier.padding(end = 8.dp))
-                PourcentageAnime(p, taille = 14.sp, couleur = couleurProba(p))
+                Column(Modifier.weight(1f)) {
+                    Text(vm.libelleComplet(code).substringAfter(" : "), fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                        maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    Text(vm.libelleComplet(code).substringBefore(" : "), fontSize = 10.sp, color = Discret, maxLines = 1)
+                }
+                Pastille(r, c, taille = 10.sp)
+                Spacer(Modifier.width(8.dp))
+                PourcentageAnime(p, Modifier.width(50.dp), taille = 15.sp, couleur = couleurProba(p),
+                    alignement = androidx.compose.ui.text.style.TextAlign.End)
+                Spacer(Modifier.width(8.dp))
+                SigneAjout(sel)
             }
         }
         // Pourquoi ce pronostic ?
@@ -334,6 +362,7 @@ private fun OngletScores(m: Match, etat: EtatApp, vm: AppViewModel) {
                 Text(pct(p, 1), fontSize = 12.sp, modifier = Modifier.width(58.dp), textAlign = androidx.compose.ui.text.style.TextAlign.End)
                 Text("cote ${cote(1 / p)}", fontSize = 11.sp, color = Discret, modifier = Modifier.width(72.dp),
                     textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                if (existe) { Spacer(Modifier.width(6.dp)); SigneAjout(sel) }
             }
         }
         Spacer(Modifier.height(6.dp))

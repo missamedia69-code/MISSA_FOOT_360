@@ -36,6 +36,8 @@ import androidx.compose.ui.unit.dp
 import com.missa.foot360.ui.EcranAccueil
 import com.missa.foot360.ui.EcranStats
 import com.missa.foot360.ui.EcranProfil
+import com.missa.foot360.ui.EcranTicketsSpeciaux
+import com.missa.foot360.ui.EcranContact
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -154,6 +156,9 @@ fun Application(vm: AppViewModel) {
                         Icon(Icons.Default.Refresh, "Actualiser", tint = Vert,
                             modifier = if (etat.actualisation) Modifier.graphicsLayer { rotationZ = angle } else Modifier)
                     }
+                    IconButton(onClick = { if (route != "reglages") nav.navigate("reglages") }) {
+                        Icon(Icons.Default.Settings, "Réglages", tint = com.missa.foot360.ui.Discret)
+                    }
                 },
             )
         },
@@ -171,8 +176,15 @@ fun Application(vm: AppViewModel) {
                             selected = route == r,
                             onClick = { allerA(nav, r) },
                             icon = {
-                                if (r == "combi" && etat.combi.isNotEmpty())
-                                    BadgedBox(badge = { androidx.compose.material3.Badge { Text("${etat.combi.size}") } }) { Icon(icone, titre) }
+                                if (r == "combi" && etat.combi.isNotEmpty()) {
+                                    // la pastille rebondit à chaque ajout ou retrait
+                                    val rebond = remember { androidx.compose.animation.core.Animatable(1f) }
+                                    LaunchedEffect(etat.combi.size) {
+                                        rebond.snapTo(1.5f); rebond.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.35f))
+                                    }
+                                    BadgedBox(badge = { androidx.compose.material3.Badge(Modifier.graphicsLayer { scaleX = rebond.value; scaleY = rebond.value }) {
+                                        Text("${etat.combi.size}") } }) { Icon(icone, titre) }
+                                }
                                 else Icon(icone, titre)
                             },
                             label = { Text(titre, fontSize = 11.sp) },
@@ -183,7 +195,11 @@ fun Application(vm: AppViewModel) {
         },
     ) { marges ->
         val aller: (String) -> Unit = { r -> if (ONGLETS.any { it.first == r }) allerA(nav, r) else nav.navigate(r) }
-        NavHost(nav, startDestination = "accueil", modifier = Modifier.padding(marges)) {
+        NavHost(nav, startDestination = "accueil", modifier = Modifier.padding(marges),
+            enterTransition = { fadeIn(tween(260)) + androidx.compose.animation.slideInHorizontally(tween(260)) { it / 14 } },
+            exitTransition = { fadeOut(tween(180)) },
+            popEnterTransition = { fadeIn(tween(260)) },
+            popExitTransition = { fadeOut(tween(180)) + androidx.compose.animation.slideOutHorizontally(tween(220)) { it / 14 } }) {
             composable("accueil") { EcranAccueil(etat, vm, { nav.navigate("match/$it") }, aller) }
             composable("matchs") { EcranMatchs(etat, vm) { nav.navigate("match/$it") } }
             composable("assistant") { EcranAssistant(etat, vm) { allerA(nav, "combi") } }
@@ -192,6 +208,8 @@ fun Application(vm: AppViewModel) {
             composable("profil") { EcranProfil(etat, vm, aller) }
             composable("experts") { EcranExperts(etat) }
             composable("reglages") { EcranReglages(vm, etat) }
+            composable("speciaux") { EcranTicketsSpeciaux(etat, vm) }
+            composable("contact") { EcranContact(etat) }
             composable("combi") { EcranCombi(etat, vm, aller) }
             composable("match/{id}") { e -> EcranDetail(etat.matchs[e.arguments?.getString("id")], etat, vm) }
         }

@@ -18,7 +18,28 @@ data class Pronostics(
     val stats_moteur: StatsMoteur? = null,
     val suivi_pronostics: SuiviPronostics? = null,
     val resultats: Map<String, List<Int>> = emptyMap(),
+    val logos: Map<String, String> = emptyMap(),
+    val config: ConfigApp = ConfigApp(),
+    val tickets_speciaux: List<TicketSpecial> = emptyList(),
 )
+
+/** Contacts et annonce, modifiables sans mise à jour de l'application (data/config_app.json). */
+@Serializable
+data class Contact(val whatsapp: String = "", val telegram: String = "", val email: String = "",
+                   val facebook: String = "", val message: String = "")
+
+@Serializable
+data class ConfigApp(val contact: Contact = Contact(), val annonce: String = "", val lien_telechargement: String = "")
+
+/** Ticket publié par l'éditeur (data/tickets_speciaux.json). */
+@Serializable
+data class SelectionSpeciale(val match_id: String? = null, val code: String = "", val domicile: String = "",
+                             val exterieur: String = "", val libelle: String = "", val cote: Double? = null)
+
+@Serializable
+data class TicketSpecial(val id: String = "", val titre: String = "", val description: String = "",
+                         val auteur: String = "", val publie_le: String = "",
+                         val selections: List<SelectionSpeciale> = emptyList())
 
 @Serializable
 data class LigneStat(val type: String = "", val niveau: String = "", val championnat: String = "", val n: Int = 0,

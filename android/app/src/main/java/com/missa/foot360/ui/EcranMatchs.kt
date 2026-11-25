@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -51,11 +53,7 @@ import com.missa.foot360.moteur.Jumeau
 @OptIn(ExperimentalFoundationApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun EcranMatchs(etat: EtatApp, vm: AppViewModel, ouvrir: (String) -> Unit) {
-    if (etat.chargement) {
-        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally) { CircularProgressIndicator() }
-        return
-    }
+    if (etat.chargement) { ListeSquelette(); return }
     val dates = etat.pronostics.championnats.flatMap { c -> c.matchs.map { it.date } }.distinct().sorted()
     // Jour affiché par défaut : aujourd'hui ou le prochain jour de match, sinon le plus chargé
     val parDefaut = remember(dates) {
@@ -135,8 +133,8 @@ fun EcranMatchs(etat: EtatApp, vm: AppViewModel, ouvrir: (String) -> Unit) {
                     Icon(if (replie) Icons.Default.ExpandMore else Icons.Default.ExpandLess, null)
                 }
             }
-            if (!replie) items(matchs, key = { it.id }) { m ->
-                CarteMatch(m, vm, etat) { ouvrir(m.id) }
+            if (!replie) itemsIndexed(matchs, key = { _, m -> m.id }) { rang, m ->
+                Box(Modifier.animateItem().apparition(rang)) { CarteMatch(m, vm, etat) { ouvrir(m.id) } }
             }
         }
     }
@@ -165,9 +163,16 @@ fun CarteMatch(m: Match, vm: AppViewModel, etat: EtatApp, ouvrir: () -> Unit) {
     Carte(Modifier.padding(horizontal = 10.dp, vertical = 4.dp), onClick = ouvrir) {
         Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(m.heure, fontSize = 12.sp, color = Or, modifier = Modifier.width(42.dp))
-                Text("${m.domicile} – ${m.exterieur}", fontWeight = FontWeight.SemiBold, fontSize = 14.sp,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                Text(m.heure, fontSize = 13.sp, color = Or, fontWeight = FontWeight.Bold, modifier = Modifier.width(46.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    listOf(m.domicile, m.exterieur).forEach { eq ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            LogoEquipe(eq, etat.pronostics.logos[eq], 20.dp)
+                            Spacer(Modifier.width(7.dp))
+                            Text(eq, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
                 if (m.selections_value.isNotEmpty()) Pastille("VALUE", Vert, taille = 10.sp)
             }
             // Pronostic du moteur, en clair

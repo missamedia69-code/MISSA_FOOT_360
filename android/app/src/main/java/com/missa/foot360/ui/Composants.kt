@@ -1,6 +1,14 @@
 package com.missa.foot360.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.composed
 import androidx.compose.foundation.border
 import androidx.compose.runtime.setValue
 import androidx.compose.animation.animateColorAsState
@@ -92,9 +100,82 @@ fun Carte(modifier: Modifier = Modifier, accent: Boolean = false, onClick: (() -
     val forme = RoundedCornerShape(14.dp)
     val fond = if (accent) androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFF0F3121), Color(0xFF0D1A13)))
                else androidx.compose.ui.graphics.SolidColor(couleurs.surfaceContainer)
-    Column(modifier.fillMaxWidth().clip(forme).background(fond)
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val presse by interaction.collectIsPressedAsState()
+    val echelle by animateFloatAsState(if (presse) 0.97f else 1f, spring(dampingRatio = 0.6f, stiffness = 600f), label = "presse")
+    Column(modifier.graphicsLayer { scaleX = echelle; scaleY = echelle }.fillMaxWidth().clip(forme).background(fond)
         .border(1.dp, if (accent) Vert.copy(alpha = 0.25f) else Bord, forme)
-        .let { if (onClick != null) it.clickable(onClick = onClick) else it }, content = content)
+        .let { if (onClick != null) it.clickable(interactionSource = interaction, indication = androidx.compose.material3.ripple(), onClick = onClick) else it },
+        content = content)
+}
+
+/** Apparition animée (fondu + légère montée), décalée selon la position dans la liste. */
+fun Modifier.apparition(rang: Int = 0): Modifier = composed {
+    val a = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay((rang.coerceIn(0, 8) * 45).toLong())
+        a.animateTo(1f, tween(380, easing = FastOutSlowInEasing))
+    }
+    graphicsLayer { alpha = a.value; translationY = (1f - a.value) * 36f }
+}
+
+/** Nombre qui défile de 0 jusqu'à sa valeur (indicateurs). */
+@Composable
+fun NombreAnime(cible: Int, suffixe: String = "", taille: TextUnit = 20.sp, couleur: Color = Vert) {
+    val a = remember { Animatable(0f) }
+    LaunchedEffect(cible) { a.animateTo(cible.toFloat(), tween(900, easing = FastOutSlowInEasing)) }
+    Text("${a.value.toInt()}$suffixe", fontSize = taille, fontWeight = FontWeight.Bold, color = couleur, maxLines = 1)
+}
+
+/** Point lumineux qui pulse (« en ligne »). */
+@Composable
+fun PointPulse(couleur: Color = Vert) {
+    val t = androidx.compose.animation.core.rememberInfiniteTransition(label = "pulse")
+    val a by t.animateFloat(0.35f, 1f, androidx.compose.animation.core.infiniteRepeatable(tween(900),
+        androidx.compose.animation.core.RepeatMode.Reverse), label = "pulseA")
+    Box(Modifier.size(8.dp).graphicsLayer { alpha = a }.clip(androidx.compose.foundation.shape.CircleShape).background(couleur))
+}
+
+/** Bloc gris animé (effet « chargement ») pour les écrans pendant le téléchargement. */
+@Composable
+fun Squelette(modifier: Modifier) {
+    val t = androidx.compose.animation.core.rememberInfiniteTransition(label = "squelette")
+    val x by t.animateFloat(-1f, 2f, androidx.compose.animation.core.infiniteRepeatable(tween(1300)), label = "x")
+    Box(modifier.clip(RoundedCornerShape(10.dp)).background(
+        androidx.compose.ui.graphics.Brush.linearGradient(
+            listOf(couleurs.surfaceContainer, couleurs.surfaceContainerHighest, couleurs.surfaceContainer),
+            start = androidx.compose.ui.geometry.Offset(x * 600f, 0f), end = androidx.compose.ui.geometry.Offset(x * 600f + 600f, 0f))))
+}
+
+@Composable
+fun ListeSquelette() {
+    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Squelette(Modifier.fillMaxWidth().height(150.dp))
+        repeat(5) { Squelette(Modifier.fillMaxWidth().height(88.dp)) }
+    }
+}
+
+private val TEINTES = listOf(0xFF2CE083, 0xFF4EA8FF, 0xFFF4BD45, 0xFFFF6F6F, 0xFFB98CFF, 0xFF3DD6D0, 0xFFF59A4A, 0xFFE86FB8)
+
+/** Logo de l'équipe ; à défaut, écusson aux initiales dans une couleur propre à l'équipe. */
+@Composable
+fun LogoEquipe(nom: String, url: String?, taille: Dp = 22.dp) {
+    val couleur = Color(TEINTES[(nom.hashCode() and 0x7fffffff) % TEINTES.size])
+    val initiales = nom.split(' ', '-', '.').filter { it.isNotBlank() && it.first().isLetter() }
+        .let { m -> if (m.size >= 2) "${m[0][0]}${m[1][0]}" else nom.take(2) }.uppercase()
+    Box(Modifier.size(taille), contentAlignment = Alignment.Center) {
+        var echec by remember(url) { mutableStateOf(url.isNullOrBlank()) }
+        if (echec) {
+            Box(Modifier.size(taille).clip(androidx.compose.foundation.shape.CircleShape)
+                .background(couleur.copy(alpha = 0.18f)).border(1.dp, couleur.copy(alpha = 0.6f), androidx.compose.foundation.shape.CircleShape),
+                contentAlignment = Alignment.Center) {
+                Text(initiales, color = couleur, fontWeight = FontWeight.Bold, fontSize = (taille.value * 0.38f).sp, maxLines = 1)
+            }
+        } else {
+            coil3.compose.AsyncImage(model = url, contentDescription = nom, modifier = Modifier.size(taille),
+                onState = { if (it is coil3.compose.AsyncImagePainter.State.Error) echec = true })
+        }
+    }
 }
 
 @Composable
@@ -148,7 +229,8 @@ fun BoutonSelection(
     val echelle by animateFloatAsState(if (selectionne) 1.04f else 1f, spring(dampingRatio = 0.5f), label = "echelle")
     Column(
         modifier.graphicsLayer { scaleX = echelle; scaleY = echelle }
-            .clip(RoundedCornerShape(8.dp)).background(fond).clickable(onClick = onClick)
+            .clip(RoundedCornerShape(8.dp)).background(fond)
+            .border(1.dp, if (selectionne) Vert else Vert.copy(alpha = 0.18f), RoundedCornerShape(8.dp)).clickable(onClick = onClick)
             .padding(horizontal = 6.dp, vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -166,6 +248,35 @@ fun BoutonAjouter(dans: Boolean, modifier: Modifier = Modifier, onClick: () -> U
         modifier = modifier.clip(RoundedCornerShape(9.dp)).background(fond)
             .border(1.dp, Vert.copy(alpha = 0.4f), RoundedCornerShape(9.dp)).clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 6.dp))
+}
+
+/** Grande tuile de sélection (fiche match) : bordure, « + » et état sélectionné bien visibles. */
+@Composable
+fun TuileChoix(titre: String, proba: Double?, selectionne: Boolean, modifier: Modifier = Modifier,
+               sousTitre: String? = null, onClick: () -> Unit) {
+    val fond by animateColorAsState(if (selectionne) Vert else couleurs.surfaceContainerHighest, tween(250), label = "tFond")
+    val texte by animateColorAsState(if (selectionne) Color(0xFF04140B) else couleurs.onSurface, tween(250), label = "tTexte")
+    val echelle by animateFloatAsState(if (selectionne) 1.03f else 1f, spring(dampingRatio = 0.5f), label = "tEch")
+    Box(modifier.graphicsLayer { scaleX = echelle; scaleY = echelle }.clip(RoundedCornerShape(12.dp)).background(fond)
+        .border(1.dp, if (selectionne) Vert else Vert.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+        .clickable(onClick = onClick)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            PourcentageAnime(proba, taille = 22.sp, couleur = if (selectionne) texte else couleurProba(proba ?: 0.0))
+            Text(titre, color = texte, fontSize = 11.sp, maxLines = 2, textAlign = TextAlign.Center, overflow = TextOverflow.Ellipsis)
+            if (sousTitre != null) Text(sousTitre, color = texte.copy(alpha = 0.7f), fontSize = 10.sp, maxLines = 1)
+        }
+        Text(if (selectionne) "✓" else "+", color = if (selectionne) texte else Vert, fontWeight = FontWeight.Bold, fontSize = 13.sp,
+            modifier = Modifier.align(Alignment.TopEnd).padding(horizontal = 7.dp, vertical = 3.dp))
+    }
+}
+
+/** Petit carré « + » / « ✓ » en bout de ligne : signale qu'une ligne s'ajoute au ticket. */
+@Composable
+fun SigneAjout(selectionne: Boolean) {
+    Box(Modifier.size(26.dp).clip(RoundedCornerShape(7.dp)).background(if (selectionne) Vert else VertFonce)
+        .border(1.dp, Vert.copy(alpha = 0.4f), RoundedCornerShape(7.dp)), contentAlignment = Alignment.Center) {
+        Text(if (selectionne) "✓" else "+", color = if (selectionne) Color(0xFF04140B) else Vert, fontWeight = FontWeight.Bold)
+    }
 }
 
 /** Barre de probabilité animée. */

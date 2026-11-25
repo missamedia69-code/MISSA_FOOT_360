@@ -97,6 +97,23 @@ exemple `ODDS_API_FREQUENCE_HEURES = 3`. Les matchs de The Odds API remplacent c
 football-data quand les deux existent ; les noms d'équipes non reconnus sont listés dans
 `etat.json` (champ `the_odds_api.noms_non_reconnus`).
 
+## Contenu géré sans mise à jour de l'application
+
+Ces fichiers se modifient directement sur GitHub (crayon « Edit »). La publication automatique
+suivante (au plus quelques heures, ou tout de suite avec « Run workflow ») les envoie aux téléphones.
+
+- `data/config_app.json` : coordonnées de « Nous contacter » (`whatsapp` au format international
+  sans « + », par ex. `22507000000` ; `telegram` ; `email` ; `facebook`), message d'annonce affiché
+  en haut de l'accueil (`annonce`) et lien de téléchargement de l'application (`lien_telechargement`).
+- `data/tickets_speciaux.json` : tickets publiés par l'équipe. Chaque sélection désigne le match par
+  `domicile` et `exterieur` (noms exactement comme dans l'application) et le pari par son `code` :
+  `1X2:1`, `1X2:N`, `1X2:2`, `DC:1N`, `DC:12`, `DC:N2`, `OU:2.5:plus`, `OU:1.5:plus`, `OU:3.5:moins`,
+  `BTTS:oui`, `BTTS:non`, `HCP3:-1:1`… ; `libelle` et `cote` sont libres. Un ticket disparaît
+  3 jours après sa date `publie_le`.
+- Logos des équipes : `missa/logos.py` les cherche sur TheSportsDB (gratuit) et les garde dans
+  `data/logos.json` ; chaque publication en ajoute (40 recherches au plus, réglable avec la variable
+  `LOGOS_MAX_REQUETES`). Sans logo, l'application affiche un écusson aux initiales.
+
 ## Application Android
 
 ```bash
