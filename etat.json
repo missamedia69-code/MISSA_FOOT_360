@@ -1,0 +1,58 @@
+{
+ "genere_le": "2026-11-28T07:58:41+00:00",
+ "matchs": 227,
+ "championnats": [
+  "ARG",
+  "B1",
+  "BRA",
+  "D1",
+  "D2",
+  "E0",
+  "E1",
+  "E2",
+  "E3",
+  "EC",
+  "F1",
+  "G1",
+  "I1",
+  "I2",
+  "MEX",
+  "N1",
+  "P1",
+  "SC0",
+  "SP1",
+  "SP2",
+  "T1"
+ ],
+ "experts": {
+  "importes": 0,
+  "refuses": [],
+  "clotures": 0
+ },
+ "the_odds_api": {
+  "active": true,
+  "recupere_le": "2026-11-27T23:30:41+00:00",
+  "credits_restants": 370,
+  "matchs": 109,
+  "noms_non_reconnus": [
+   "ARG: Instituto de Córdoba",
+   "D1: FSV Mainz 05",
+   "E0: Coventry City",
+   "E0: Hull City",
+   "SP1: Real Racing Club de Santander"
+  ]
+ },
+ "suivi_value": {
+  "publies": 133,
+  "regles": 24,
+  "en_attente": 109,
+  "clv_moyen": -0.0099,
+  "clv_positif": 0.4783,
+  "clv_t_score": -0.39,
+  "rendement": 0.3492,
+  "reussite": 0.375,
+  "valeur_annoncee_moyenne": 0.0529,
+  "ajoutes": 0,
+  "clotures": 0
+ }
+}
